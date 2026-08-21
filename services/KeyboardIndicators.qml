@@ -25,6 +25,10 @@ Singleton {
     property bool capsLock: false
     property bool numLock: false
     property bool ready: false
+    property bool touchpadOff: false
+    property bool _touchpadStateKnown: false
+    readonly property string touchpadConfigPath:
+        Quickshell.env("HOME") + "/.config/niri/config.d/10-input-and-cursor.kdl"
     property string popupKind: ""
     property bool popupActive: false
     property string popupText: ""
@@ -42,22 +46,39 @@ Singleton {
     readonly property string currentLayoutName: HyprlandXkb.currentLayoutName ?? ""
     readonly property string currentLayoutCode: HyprlandXkb.currentLayoutCode ?? ""
     readonly property string capsMaterialIcon: "keyboard_capslock"
+    readonly property string touchpadMaterialIcon: "touchpad_mouse"
     readonly property string numMaterialIcon: "dialpad"
     readonly property string capsFluentIcon: "key"
     readonly property string numFluentIcon: "keyboard-dock"
-    readonly property string popupMaterialIcon: root.popupKind === "layout" ? "language"
+    readonly property string touchpadFluentIcon: "touchpad"
+    readonly property string popupMaterialIcon:
+        root.popupKind === "layout" ? "language"
         : root.popupKind === "caps" ? root.capsMaterialIcon
+        : root.popupKind === "touchpad" ? root.touchpadMaterialIcon
         : root.numMaterialIcon
-    readonly property string popupFluentIcon: root.popupKind === "layout" ? "keyboard"
+    readonly property string popupFluentIcon:
+        root.popupKind === "layout" ? "keyboard"
         : root.popupKind === "caps" ? root.capsFluentIcon
+        : root.popupKind === "touchpad" ? root.touchpadFluentIcon
         : root.numFluentIcon
     readonly property string currentLayoutCodeMultiline: root.abbreviateLayoutCode(root.currentLayoutCode, "\n")
     readonly property string currentLayoutCodeInline: root.abbreviateLayoutCode(root.currentLayoutCode, " ").toUpperCase()
     readonly property bool usingEvdev: root._lockSource === "evdev"
-    readonly property bool layoutVisible: root.showLayoutPanel && root.hasMultipleLayouts && root.currentLayoutCode.length > 0
-    readonly property bool capsLockVisible: root.showCapsPanel && root.capsLock
-    readonly property bool numLockVisible: root.showNumPanel && root.numLock
-    readonly property bool hasPanelIndicators: root.layoutVisible || root.capsLockVisible || root.numLockVisible
+    readonly property bool layoutVisible:
+        root.showLayoutPanel &&
+        root.hasMultipleLayouts &&
+        root.currentLayoutCode.length > 0
+    readonly property bool capsLockVisible:
+        root.showCapsPanel && root.capsLock
+    readonly property bool numLockVisible:
+        root.showNumPanel && root.numLock
+    readonly property bool touchpadVisible:
+        root.showPanel && root.touchpadOff
+    readonly property bool hasPanelIndicators:
+        root.layoutVisible ||
+        root.capsLockVisible ||
+        root.numLockVisible ||
+        root.touchpadVisible
 
     function _log(...args) {
         if (Quickshell.env("QS_DEBUG") === "1")
@@ -72,6 +93,31 @@ Singleton {
             const baseLayout = layout.split("-")[0];
             return baseLayout.slice(0, 4);
         }).join(separator);
+    }
+
+    function _parseTouchpadOff(configText): bool {
+        const match = String(configText).match(
+            /(?:^|\n)[ \t]*touchpad[ \t]*\{([\s\S]*?)[ \t]*\}/
+        );
+
+        if (!match)
+            return false;
+
+        return /(?:^|\n)[ \t]*off[ \t]*(?=\n|$)/.test(match[1]);
+    }
+
+    function _setTouchpadState(nextOff: bool, allowPopup: bool): void {
+        const previousOff = root.touchpadOff;
+
+        root.touchpadOff = nextOff;
+
+        if (!root._touchpadStateKnown) {
+            root._touchpadStateKnown = true;
+            return;
+        }
+
+        if (allowPopup && previousOff !== nextOff)
+            root.showTouchpadPopup(!nextOff);
     }
 
     function refreshLedPaths() {
@@ -151,6 +197,16 @@ Singleton {
         }
 
         root._setPopup(kind, active, active ? Translation.tr("Num Lock on") : Translation.tr("Num Lock off"));
+    }
+
+    function showTouchpadPopup(enabled: bool): void {
+        root._setPopup(
+            "touchpad",
+            enabled,
+            enabled
+                ? Translation.tr("Touchpad on")
+                : Translation.tr("Touchpad off")
+        );
     }
 
     function _emitLayoutPopup() {
@@ -419,6 +475,22 @@ Singleton {
 
             root._knownLayoutName = root.currentLayoutName;
             root._emitLayoutPopup();
+        }
+    }
+
+    FileView {
+        id: touchpadConfigView
+        path: root.touchpadConfigPath
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: {
+            root._setTouchpadState(
+                root._parseTouchpadOff(text()),
+                true
+            );
+        }
+        onLoadFailed: {
+            root._log("Failed to read touchpad config:", root.touchpadConfigPath);
         }
     }
 

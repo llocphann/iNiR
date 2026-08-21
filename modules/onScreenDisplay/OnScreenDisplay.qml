@@ -140,7 +140,7 @@ Scope {
 
     Timer {
         id: osdTimeout
-        interval: root.currentIndicator === "media" 
+        interval: root.currentIndicator === "media"
             ? (Config.options?.osd?.timeout ?? 2000) + 1000  // Longer for media
             : (Config.options?.osd?.timeout ?? 2000)
         repeat: false
@@ -436,6 +436,20 @@ Scope {
 
         function toggle(): void {
             GlobalStates.osdVolumeOpen = !GlobalStates.osdVolumeOpen;
+        }
+    }
+
+    IpcHandler {
+        target: "osdInput"
+
+        function touchpad(state: string): void {
+            const normalized = state.trim().toLowerCase();
+
+            if (normalized === "on") {
+                KeyboardIndicators.showTouchpadPopup(true);
+            } else if (normalized === "off") {
+                KeyboardIndicators.showTouchpadPopup(false);
+            }
         }
     }
 

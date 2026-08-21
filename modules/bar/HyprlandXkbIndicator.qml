@@ -37,6 +37,24 @@ Loader {
             }
 
             MaterialSymbol {
+                opacity: KeyboardIndicators.touchpadVisible ? 1 : 0
+                visible: opacity > 0
+                text: KeyboardIndicators.touchpadMaterialIcon
+                iconSize: Appearance.font.pixelSize.large
+                fill: 1
+                color: root.color
+
+                Behavior on opacity {
+                    enabled: Appearance.animationsEnabled
+                    NumberAnimation {
+                        duration: Appearance.animation.elementMoveFast.duration
+                        easing.type: Appearance.animation.elementMoveFast.type
+                        easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve
+                    }
+                }
+            }
+
+            MaterialSymbol {
                 opacity: KeyboardIndicators.numLockVisible ? 1 : 0
                 visible: opacity > 0
                 text: KeyboardIndicators.numMaterialIcon
@@ -80,6 +98,25 @@ Loader {
                 Behavior on opacity {
                     enabled: Appearance.animationsEnabled
                     NumberAnimation { duration: Appearance.animation.elementMoveFast.duration; easing.type: Appearance.animation.elementMoveFast.type; easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve }
+                }
+            }
+
+            MaterialSymbol {
+                opacity: KeyboardIndicators.touchpadVisible ? 1 : 0
+                visible: opacity > 0
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: KeyboardIndicators.touchpadMaterialIcon
+                iconSize: Appearance.font.pixelSize.large
+                fill: 1
+                color: root.color
+
+                Behavior on opacity {
+                    enabled: Appearance.animationsEnabled
+                    NumberAnimation {
+                        duration: Appearance.animation.elementMoveFast.duration
+                        easing.type: Appearance.animation.elementMoveFast.type
+                        easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve
+                    }
                 }
             }
 
