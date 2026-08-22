@@ -43,10 +43,12 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 if [ -z "$value" ]; then
-    # Remove only iNiR's own drop-in. Re-run TLP so any user-managed TLP
-    # configuration becomes authoritative again; do not erase it with
-    # `tlp fullcharge`.
+    # Removing the drop-in alone is not sufficient: TLP charge thresholds may
+    # persist in firmware until they are explicitly restored to vendor defaults.
+    # Remove only iNiR's own drop-in, restore the vendor defaults, then let TLP
+    # apply the remaining user configuration.
     rm -f "$config_file"
+    /usr/bin/tlp fullcharge
     /usr/bin/tlp start
     exit 0
 fi
