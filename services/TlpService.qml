@@ -3,6 +3,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.modules.common
 
 Singleton {
     id: root
@@ -82,6 +83,11 @@ Singleton {
             root.active = match !== null
             root.currentLimit = root.active ? -1 : 100
             return
+        } else if (root._plugin === "lenovo-legacy") {
+            const match = text.match(/conservation_mode\s*=\s*(\d+)/)
+            root.active = match ? parseInt(match[1]) === 1 : false
+            root.currentLimit = root.active ? -1 : 100
+            return
         }
 
         root.currentLimit = value
@@ -98,7 +104,11 @@ Singleton {
         applyProcess.running = true
     }
 
-    Component.onCompleted: _detect()
+    Component.onCompleted: {
+        _detect()
+        if (Config.ready && root.enabled)
+            Qt.callLater(() => root.apply())
+    }
 
     Connections {
         target: Config
