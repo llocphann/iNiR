@@ -170,47 +170,18 @@ Singleton {
             && _rawChargeLimitValue === _desiredChargeLimitValue(enable)
     }
 
+    // Writes are delegated to a root-owned helper. The helper validates the
+    // backend/value and resolves the sysfs path itself; QML never gets to pass
+    // an arbitrary path to a privileged shell command.
     function _buildChargeLimitWriteCommand(enable: bool) {
-        switch (_chargeLimitBackend) {
-        case "ideapad":
-        case "samsung":
-            return [
-                "/usr/bin/pkexec", "/bin/sh", "-c",
-                "printf '%s' \"$1\" > \"$2\"",
-                "battery-charge-limit",
-                String(_desiredChargeLimitValue(enable)),
-                _chargeLimitSysfsPath,
-            ]
-        case "lg-legacy":
-            return [
-                "/usr/bin/pkexec", "/bin/sh", "-c",
-                "printf '%s' \"$1\" > \"$2\"",
-                "battery-charge-limit",
-                String(_desiredChargeLimitValue(enable)),
-                _chargeLimitSysfsPath,
-            ]
-        case "huawei":
-            return [
-                "/usr/bin/pkexec", "/bin/sh", "-c",
-                "printf '%s %s' \"$1\" \"$2\" > \"$3\"",
-                "battery-charge-limit",
-                "0",
-                String(_desiredChargeLimitValue(enable)),
-                _chargeLimitSysfsPath,
-            ]
-        case "threshold":
-        case "smapi":
-        case "sony":
-            return [
-                "/usr/bin/pkexec", "/bin/sh", "-c",
-                "printf '%s' \"$1\" > \"$2\"",
-                "battery-charge-limit",
-                String(_desiredChargeLimitValue(enable)),
-                _chargeLimitSysfsPath,
-            ]
-        default:
-            return []
-        }
+        if (_chargeLimitBackend.length === 0) return []
+        return [
+            "/usr/bin/pkexec",
+            "/usr/libexec/inir-battery-charge-limit",
+            "--set",
+            _chargeLimitBackend,
+            String(_desiredChargeLimitValue(enable)),
+        ]
     }
 
     Process {

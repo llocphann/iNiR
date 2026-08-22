@@ -1,0 +1,116 @@
+#!/bin/sh
+set -eu
+
+usage() {
+    printf '%s\n' 'Usage: inir-battery-charge-limit --set <backend> <value>' >&2
+    exit 2
+}
+
+[ "${1:-}" = "--set" ] || usage
+[ "$#" -eq 3 ] || usage
+
+backend="$2"
+value="$3"
+
+case "$value" in
+    ''|*[!0-9]*)
+        printf '%s\n' 'Invalid charge limit value.' >&2
+        exit 2
+        ;;
+esac
+
+[ "$value" -le 100 ] || {
+    printf '%s\n' 'Charge limit must be between 0 and 100.' >&2
+    exit 2
+}
+
+find_threshold_path() {
+    for dir in /sys/class/power_supply/*; do
+        [ -d "$dir" ] || continue
+        [ "$(cat "$dir/type" 2>/dev/null || true)" = "Battery" ] || continue
+        if [ -f "$dir/present" ] && [ "$(cat "$dir/present" 2>/dev/null || true)" = "0" ]; then
+            continue
+        fi
+        for attr in charge_control_end_threshold charge_stop_threshold; do
+            if [ -w "$dir/$attr" ]; then
+                printf '%s\n' "$dir/$attr"
+                return 0
+            fi
+        done
+    done
+    return 1
+}
+
+find_path() {
+    case "$backend" in
+        threshold)
+            find_threshold_path
+            ;;
+        smapi)
+            for path in /sys/devices/platform/smapi/BAT*/stop_charge_thresh; do
+                [ -w "$path" ] && { printf '%s\n' "$path"; return 0; }
+            done
+            ;;
+        ideapad)
+            for path in /sys/bus/platform/drivers/ideapad_acpi/*/conservation_mode; do
+                [ -w "$path" ] && { printf '%s\n' "$path"; return 0; }
+            done
+            ;;
+        lg-legacy)
+            [ -w /sys/devices/platform/lg-laptop/battery_care_limit ] && printf '%s\n' /sys/devices/platform/lg-laptop/battery_care_limit
+            ;;
+        samsung)
+            [ -w /sys/devices/platform/samsung/battery_life_extender ] && printf '%s\n' /sys/devices/platform/samsung/battery_life_extender
+            ;;
+        sony)
+            [ -w /sys/devices/platform/sony-laptop/battery_care_limiter ] && printf '%s\n' /sys/devices/platform/sony-laptop/battery_care_limiter
+            ;;
+        huawei)
+            [ -w /sys/devices/platform/huawei-wmi/charge_control_thresholds ] && printf '%s\n' /sys/devices/platform/huawei-wmi/charge_control_thresholds
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+path="$(find_path || true)"
+[ -n "$path" ] || {
+    printf 'Charge-limit backend is no longer available: %s\n' "$backend" >&2
+    exit 1
+}
+
+case "$backend" in
+    ideapad|samsung)
+        printf '%s' "$value" > "$path"
+        ;;
+    lg-legacy)
+        case "$value" in
+            80|100) printf '%s' "$value" > "$path" ;;
+            *) printf '%s\n' 'LG legacy backend only supports 80 or 100.' >&2; exit 2 ;;
+        esac
+        ;;
+    sony)
+        case "$value" in
+            0|50|80|100) printf '%s' "$value" > "$path" ;;
+            *) printf '%s\n' 'Sony backend only supports 0, 50, 80 or 100.' >&2; exit 2 ;;
+        esac
+        ;;
+    huawei)
+        current="$(cat "$path" 2>/dev/null || true)"
+        start="$(printf '%s\n' "$current" | awk '{print $1}')"
+        case "$start" in
+            ''|*[!0-9]*) start=0 ;;
+        esac
+        [ "$start" -le 100 ] || start=0
+        [ "$value" -ge "$start" ] || start=0
+        printf '%s %s' "$start" "$value" > "$path"
+        ;;
+    threshold|smapi)
+        printf '%s' "$value" > "$path"
+        ;;
+    *)
+        printf 'Unsupported charge-limit backend: %s\n' "$backend" >&2
+        exit 2
+        ;;
+esac

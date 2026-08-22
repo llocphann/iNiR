@@ -2,6 +2,7 @@ pragma Singleton
 
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import Quickshell.Services.UPower
 import qs.modules.common
 
@@ -9,6 +10,8 @@ Singleton {
     id: root
 
     property bool _initialized: false
+    property bool _tlpProbeDone: false
+    property bool _tlpPdManaged: false
 
     function _profileToString(profile): string {
         switch (profile) {
@@ -29,10 +32,17 @@ Singleton {
     }
 
     function _applyPreferredProfile(): void {
-        if (!Config.ready || root._initialized)
+        if (!Config.ready || root._initialized || !root._tlpProbeDone)
             return
 
         root._initialized = true
+
+        // When tlp-pd is enabled it owns profile selection, including AC/BAT
+        // automatic switching. Restoring iNiR's last observed profile here
+        // would turn an automatically selected TLP profile into a forced one
+        // on the next shell start.
+        if (root._tlpPdManaged)
+            return
 
         const restore = Config.options?.powerProfiles?.restoreOnStart ?? true
         const preferred = Config.options?.powerProfiles?.preferredProfile ?? ""
@@ -52,28 +62,45 @@ Singleton {
         }
     }
 
+    function _probeTlpPd(): void {
+        if (!tlpPdProbe.running)
+            tlpPdProbe.running = true
+    }
+
     Connections {
         target: Config
         function onReadyChanged() {
-            if (Config.ready) {
-                Qt.callLater(() => root._applyPreferredProfile())
-            }
+            if (Config.ready)
+                root._probeTlpPd()
         }
     }
 
-    // Covers the path where Config was ALREADY ready before this singleton was
-    // instantiated (hot-reload, or deferred loading after Config.ready fired) —
-    // onReadyChanged never re-arms in that case. _applyPreferredProfile is
-    // idempotent via _initialized, so running both is safe.
+    // Covers the path where Config was already ready before this singleton was
+    // instantiated (hot-reload or deferred loading after Config.ready fired).
     Component.onCompleted: {
-        if (Config.ready) {
-            Qt.callLater(() => root._applyPreferredProfile())
+        if (Config.ready)
+            root._probeTlpPd()
+    }
+
+    Process {
+        id: tlpPdProbe
+        command: ["/usr/bin/systemctl", "is-enabled", "--quiet", "tlp-pd.service"]
+        onExited: (exitCode, exitStatus) => {
+            root._tlpPdManaged = exitCode === 0
+            root._tlpProbeDone = true
+            if (Config.ready)
+                Qt.callLater(() => root._applyPreferredProfile())
         }
     }
 
     Connections {
         target: PowerProfiles
         function onProfileChanged() {
+            // TLP/tlp-pd owns this state when enabled; do not persist its
+            // automatically selected AC/BAT profile as iNiR's user preference.
+            if (root._tlpPdManaged)
+                return
+
             const s = root._profileToString(PowerProfiles.profile)
             if (s.length === 0)
                 return
