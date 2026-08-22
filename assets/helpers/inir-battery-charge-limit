@@ -2,115 +2,101 @@
 set -eu
 
 usage() {
-    printf '%s\n' 'Usage: inir-battery-charge-limit --set <backend> <value>' >&2
+    printf '%s\n' 'Usage: inir-battery-charge-limit --set <value> | --disable' >&2
     exit 2
 }
 
-[ "${1:-}" = "--set" ] || usage
-[ "$#" -eq 3 ] || usage
-
-backend="$2"
-value="$3"
-
-case "$value" in
-    ''|*[!0-9]*)
-        printf '%s\n' 'Invalid charge limit value.' >&2
-        exit 2
+case "${1:-}" in
+    --set)
+        [ "$#" -eq 2 ] || usage
+        value="$2"
+        ;;
+    --disable)
+        [ "$#" -eq 1 ] || usage
+        value=""
+        ;;
+    *)
+        usage
         ;;
 esac
 
-[ "$value" -le 100 ] || {
-    printf '%s\n' 'Charge limit must be between 0 and 100.' >&2
-    exit 2
-}
-
-find_threshold_path() {
-    for dir in /sys/class/power_supply/*; do
-        [ -d "$dir" ] || continue
-        [ "$(cat "$dir/type" 2>/dev/null || true)" = "Battery" ] || continue
-        if [ -f "$dir/present" ] && [ "$(cat "$dir/present" 2>/dev/null || true)" = "0" ]; then
-            continue
-        fi
-        for attr in charge_control_end_threshold charge_stop_threshold; do
-            if [ -w "$dir/$attr" ]; then
-                printf '%s\n' "$dir/$attr"
-                return 0
-            fi
-        done
-    done
-    return 1
-}
-
-find_path() {
-    case "$backend" in
-        threshold)
-            find_threshold_path
-            ;;
-        smapi)
-            for path in /sys/devices/platform/smapi/BAT*/stop_charge_thresh; do
-                [ -w "$path" ] && { printf '%s\n' "$path"; return 0; }
-            done
-            ;;
-        ideapad)
-            for path in /sys/bus/platform/drivers/ideapad_acpi/*/conservation_mode; do
-                [ -w "$path" ] && { printf '%s\n' "$path"; return 0; }
-            done
-            ;;
-        lg-legacy)
-            [ -w /sys/devices/platform/lg-laptop/battery_care_limit ] && printf '%s\n' /sys/devices/platform/lg-laptop/battery_care_limit
-            ;;
-        samsung)
-            [ -w /sys/devices/platform/samsung/battery_life_extender ] && printf '%s\n' /sys/devices/platform/samsung/battery_life_extender
-            ;;
-        sony)
-            [ -w /sys/devices/platform/sony-laptop/battery_care_limiter ] && printf '%s\n' /sys/devices/platform/sony-laptop/battery_care_limiter
-            ;;
-        huawei)
-            [ -w /sys/devices/platform/huawei-wmi/charge_control_thresholds ] && printf '%s\n' /sys/devices/platform/huawei-wmi/charge_control_thresholds
-            ;;
-        *)
-            return 1
+if [ -n "$value" ]; then
+    case "$value" in
+        ''|*[!0-9]*)
+            printf '%s\n' 'Invalid charge limit value.' >&2
+            exit 2
             ;;
     esac
-}
+    [ "$value" -le 100 ] || {
+        printf '%s\n' 'Charge limit must be between 0 and 100.' >&2
+        exit 2
+    }
+fi
 
-path="$(find_path || true)"
-[ -n "$path" ] || {
-    printf 'Charge-limit backend is no longer available: %s\n' "$backend" >&2
-    exit 1
-}
+config_dir=/etc/tlp.d
+config_file="$config_dir/99-inir-battery-charge-limit.conf"
+tmp_file="$config_file.tmp.$$"
 
-case "$backend" in
-    ideapad|samsung)
-        printf '%s' "$value" > "$path"
+cleanup() {
+    rm -f "$tmp_file"
+}
+trap cleanup EXIT INT TERM
+
+if [ -z "$value" ]; then
+    # Remove only iNiR's own drop-in. Re-run TLP so any user-managed TLP
+    # configuration becomes authoritative again; do not erase it with
+    # `tlp fullcharge`.
+    rm -f "$config_file"
+    /usr/bin/tlp start
+    exit 0
+fi
+
+# TLP is the authority for vendor/plugin semantics. The helper runs as root
+# after polkit authentication, so tlp-stat can safely identify the active
+# battery-care plugin before we generate the persistent drop-in.
+status=$(/usr/bin/tlp-stat -b 2>/dev/null || true)
+plugin=$(printf '%s\n' "$status" | awk -F': *' '/^Plugin:/ { print $2; exit }')
+features=$(printf '%s\n' "$status" | awk -F': *' '/^Supported features:/ { print $2; exit }')
+
+case "$features" in
+    *"charge threshold"*|*"charge thresholds"*|*"charge type"*) ;;
+    *)
+        printf '%s\n' 'TLP reports battery charge control as unsupported on this device.' >&2
+        exit 1
         ;;
-    lg-legacy)
-        case "$value" in
-            80|100) printf '%s' "$value" > "$path" ;;
-            *) printf '%s\n' 'LG legacy backend only supports 80 or 100.' >&2; exit 2 ;;
-        esac
+esac
+
+start=0
+stop="$value"
+
+case "$plugin" in
+    lenovo|lenovo-legacy|samsung|lg|lg-legacy)
+        # These TLP plugins expose a fixed vendor-specific care mode. The
+        # configured STOP value is a 0/1 switch, not a percentage.
+        stop=1
         ;;
     sony)
         case "$value" in
-            0|50|80|100) printf '%s' "$value" > "$path" ;;
-            *) printf '%s\n' 'Sony backend only supports 0, 50, 80 or 100.' >&2; exit 2 ;;
+            0|50) stop=50 ;;
+            51|52|53|54|55|56|57|58|59|60|61|62|63|64|65|66|67|68|69|70|71|72|73|74|75|76|77|78|79|80) stop=80 ;;
+            81|82|83|84|85|86|87|88|89|90|91|92|93|94|95|96|97|98|99|100) stop=100 ;;
         esac
-        ;;
-    huawei)
-        current="$(cat "$path" 2>/dev/null || true)"
-        start="$(printf '%s\n' "$current" | awk '{print $1}')"
-        case "$start" in
-            ''|*[!0-9]*) start=0 ;;
-        esac
-        [ "$start" -le 100 ] || start=0
-        [ "$value" -ge "$start" ] || start=0
-        printf '%s %s' "$start" "$value" > "$path"
-        ;;
-    threshold|smapi)
-        printf '%s' "$value" > "$path"
-        ;;
-    *)
-        printf 'Unsupported charge-limit backend: %s\n' "$backend" >&2
-        exit 2
         ;;
 esac
+
+# A start value of 0 is the documented dummy value when only the stop
+# threshold is controlled. RESTORE_THRESHOLDS_ON_BAT keeps the configured
+# policy active when TLP handles an AC->battery transition.
+mkdir -p "$config_dir"
+{
+    printf '%s\n' '# Managed by iNiR. Do not edit manually.'
+    printf 'START_CHARGE_THRESH_BAT0=%s\n' "$start"
+    printf 'STOP_CHARGE_THRESH_BAT0=%s\n' "$stop"
+    printf '%s\n' 'RESTORE_THRESHOLDS_ON_BAT=1'
+} > "$tmp_file"
+chmod 0644 "$tmp_file"
+mv -f "$tmp_file" "$config_file"
+
+# Activate the persistent configuration immediately. TLP validates the values
+# and reports vendor-specific errors instead of allowing a raw sysfs write.
+/usr/bin/tlp start
