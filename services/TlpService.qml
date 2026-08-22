@@ -153,6 +153,10 @@ Singleton {
                 return
             }
             root._parseStatus()
+            // Detection is asynchronous. Config may already be ready by the
+            // time tlp-stat finishes, so reconcile the persisted setting now.
+            if (root.enabled)
+                Qt.callLater(() => root.apply())
         }
     }
 
