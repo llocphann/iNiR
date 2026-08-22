@@ -44,7 +44,7 @@ Singleton {
         const features = featuresMatch ? featuresMatch[1].trim().toLowerCase() : ""
         const hasChargeControl = features.includes("charge threshold") || features.includes("charge thresholds") || features.includes("charge type")
 
-        root.available = text.length > 0
+        root.available = pluginMatch !== null
         root.supported = hasChargeControl
         root.backend = root._plugin
         root.adjustable = hasChargeControl && root._fixedPlugins.indexOf(root._plugin) < 0
@@ -55,9 +55,9 @@ Singleton {
             return
         }
 
-        // Prefer the actual threshold reported by TLP. This intentionally
-        // avoids treating raw sysfs attributes as proof of TLP support: TLP
-        // can report a generic plugin while the kernel still exposes them.
+        // TLP is the authority. Raw sysfs attributes are deliberately not used
+        // for capability detection because TLP can expose them on an unsupported
+        // generic plugin.
         const thresholdPatterns = [
             /charge_control_end_threshold\s*=\s*(\d+)\s*\[%\]/,
             /battery_care_limit\s*=\s*(\d+)\s*\[%\]/,
@@ -74,21 +74,18 @@ Singleton {
             }
         }
 
-        // Fixed plugins sometimes expose their state without a numeric
-        // threshold in the standard sysfs line.
         if (root._plugin === "samsung") {
             const match = text.match(/battery_life_extender\s*=\s*(\d+)/)
             if (match) value = parseInt(match[1]) === 1 ? 80 : 100
         } else if (root._plugin === "lenovo") {
             const match = text.match(/charge_types\s*=.*\[Long_Life\]/)
-            value = match ? 1 : 0
+            root.active = match !== null
+            root.currentLimit = root.active ? -1 : 100
+            return
         }
 
         root.currentLimit = value
-        if (root._plugin === "lenovo")
-            root.active = value === 1
-        else
-            root.active = value > 0 && value < 100
+        root.active = value > 0 && value < 100
     }
 
     function apply(): void {
