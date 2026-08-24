@@ -231,6 +231,14 @@ Singleton {
             desc: Translation.tr("Move and resize persistent shell surfaces"),
             essential: true,
             component: "modules/settings/ShellLayoutConfig.qml"
+        },
+        {
+            key: "tlp",
+            name: Translation.tr("Battery"),
+            icon: "battery_saver",
+            desc: Translation.tr("Charge care and TLP power management"),
+            essential: true,
+            component: "modules/settings/TlpConfig.qml"
         }
     ]
 
@@ -240,7 +248,7 @@ Singleton {
         { label: Translation.tr("Essentials"), pages: [0] },
         { label: Translation.tr("Appearance"), pages: [4, 25, 3, 14, 21] },
         { label: Translation.tr("Shell"), pages: [2, 26, 5, 22, 23, 16, 10, 11, 18, 19, 20] },
-        { label: Translation.tr("System"), pages: [1, 24, 7, 6, 12, 15, 8, 17] },
+        { label: Translation.tr("System"), pages: [1, 27, 24, 7, 6, 12, 15, 8, 17] },
         { label: Translation.tr("Reference"), pages: [9, 13] }
     ]
 
@@ -287,6 +295,20 @@ Singleton {
     }
 
     readonly property var staticSearchIndex: [
+        {
+            pageIndex: 27, pageName: root.pages[27].name,
+            section: Translation.tr("Power management"),
+            label: Translation.tr("Battery and TLP settings"),
+            description: Translation.tr("Power profiles, processor, disks, PCIe, USB, radios and battery care"),
+            keywords: ["tlp", "power", "battery", "cpu", "processor", "disk", "pcie", "usb", "radio", "energy", "profile", "charge"]
+        },
+        {
+            pageIndex: 27, pageName: root.pages[27].name,
+            section: Translation.tr("Battery Care"),
+            label: Translation.tr("Charge limit"),
+            description: Translation.tr("Hardware-aware TLP battery charge thresholds"),
+            keywords: ["tlp", "battery", "charge", "limit", "threshold", "thinkpad", "conservation"]
+        },
         {
             pageIndex: 26, pageName: root.pages[26].name,
             section: Translation.tr("Live shell layout"),
