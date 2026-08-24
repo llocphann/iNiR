@@ -7,7 +7,7 @@
 
 pkgname=inir-deps
 pkgver=2.29.1
-pkgrel=1
+pkgrel=4
 pkgdesc='iNiR desktop shell - dependency tracker (meta-package)'
 url='https://github.com/snowarch/inir'
 arch=(any)
@@ -127,6 +127,12 @@ depends=(
   glib2
   starship
   eza
+
+  #--- Power management ---
+  tlp
+  tlp-pd
+  tlp-rdw
+  ethtool
 
   #--- Input / HW ---
   upower

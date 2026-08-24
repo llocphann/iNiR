@@ -156,6 +156,19 @@ Input simulation, hardware control, and idle management.
 
 ---
 
+## Power Management
+
+TLP-backed battery care, power profiles, and device power policy.
+
+| Package | Purpose |
+|---------|---------|
+| `tlp` | Core TLP power-management service and configuration |
+| `tlp-pd` | Power Profiles D-Bus compatibility backed by TLP |
+| `tlp-rdw` | TLP Radio Device Wizard for network-triggered radio switching |
+| `ethtool` | Ethernet Wake-on-LAN control used by TLP's `WOL_DISABLE` setting |
+
+---
+
 ## Fonts & Theming (`inir-fonts`)
 
 Fonts, theming, and utilities.
@@ -185,7 +198,7 @@ Fonts, theming, and utilities.
 | `ttf-readex-pro` | Readex Pro font | No (has fallback) |
 | `ttf-rubik-vf` | Rubik variable font | No (has fallback) |
 | `otf-space-grotesk` | Space Grotesk font | No (has fallback) |
-| `ttf-twemoji` | Twitter emoji | No (has fallback) |
+| `ttf-twemoji` | Twitter emoji font | No (has fallback) |
 | `adw-gtk-theme-git` | Adwaita GTK theme | Yes |
 | `capitaine-cursors` | Capitaine cursor theme | Yes |
 | `xwayland-satellite` | Xwayland helper for legacy apps | Yes |

@@ -27,7 +27,9 @@ Singleton {
     property bool interactionAvailable: impl?.interactionAvailable ?? false
 
     readonly property string rawMessage: String(flow?.message ?? "").trim()
-    readonly property bool batteryChargeLimitRequest: rawMessage.includes("battery-charge-limit")
+    readonly property string actionId: String(flow?.actionId ?? "").trim()
+    readonly property bool batteryChargeLimitRequest: actionId === "org.inir.battery-charge-limit"
+        || rawMessage.includes("battery-charge-limit")
     readonly property string cleanMessage: {
         if (batteryChargeLimitRequest)
             return Translation.tr("Do you want to allow this app to make changes to your device?")

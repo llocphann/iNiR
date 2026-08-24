@@ -30,6 +30,8 @@ Item {
     
     // Complete search index with all individual options + targetLabel for spotlight
     property var searchIndex: [
+        { pageIndex: 18, pageName: "Battery", section: "Power management", label: "Battery and TLP settings", targetLabel: "Configuration categories", keywords: ["tlp", "power", "battery", "cpu", "processor", "disk", "pcie", "usb", "radio", "energy", "profile"] },
+        { pageIndex: 18, pageName: "Battery", section: "Battery Care", label: "Charge limit", targetLabel: "Hardware-aware charge care", keywords: ["tlp", "battery", "charge", "limit", "threshold", "thinkpad", "conservation"] },
         { pageIndex: 17, pageName: "Shell Layout", section: "Live shell layout", label: "Edit live", targetLabel: "Edit live", keywords: ["layout", "move", "position", "taskbar", "output", "edit", "live"] },
         { pageIndex: 17, pageName: "Shell Layout", section: "Taskbar placement", label: "Current position", targetLabel: "Current position", keywords: ["layout", "taskbar", "top", "bottom", "position", "reset"] },
         // === Quick (0) ===
@@ -749,9 +751,11 @@ Item {
                                 // Page icon
                                 FluentIcon {
                                     icon: {
-                                        var icons = ["home", "settings", "desktop", "image", "color", 
-                                                    "apps", "settings-cog-multiple", "desktop", "info"];
-                                        return icons[resultDelegate.modelData.pageIndex] || "settings";
+                                        const pageIndex = resultDelegate.modelData.pageIndex
+                                        const page = pageIndex >= 0 && pageIndex < root.pages.length
+                                            ? root.pages[pageIndex]
+                                            : null
+                                        return page?.icon || "settings"
                                     }
                                     implicitSize: 16
                                     color: resultDelegate.ListView.isCurrentItem 

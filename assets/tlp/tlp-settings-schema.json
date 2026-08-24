@@ -1,0 +1,1736 @@
+{
+  "schema": 1,
+  "supportedVersions": [
+    "1.10",
+    "1.11"
+  ],
+  "sources": [
+    "https://github.com/linrunner/TLP/blob/1.10.2/tlp.conf",
+    "https://github.com/linrunner/TLP/blob/main/tlp.conf",
+    "https://github.com/d4nj1/TLPUI/blob/master/tlpui/configschema/1_10.yaml"
+  ],
+  "categories": [
+    {
+      "name": "General",
+      "description": "TLP service, profile switching and diagnostic behavior.",
+      "settings": [
+        {
+          "key": "TLP_ENABLE",
+          "group": "TLP_ENABLE",
+          "type": "select",
+          "values": [
+            "0",
+            "1"
+          ],
+          "description": "Enable/disable TLP"
+        },
+        {
+          "key": "TLP_DISABLE_DEFAULTS",
+          "group": "TLP_DISABLE_DEFAULTS",
+          "type": "select",
+          "values": [
+            "0",
+            "1"
+          ],
+          "description": "Set to 1 to deactivate all intrinsic defaults of TLP. This means that\nTLP only applies settings that have been explicitly activated i.e.\nparameters without a leading '#'.\nNotes:\n- Helpful if one wants to use only selected features of TLP\n- After activation, use tlp-stat -c to display your effective configuration"
+        },
+        {
+          "key": "TLP_WARN_LEVEL",
+          "group": "TLP_WARN_LEVEL",
+          "type": "select",
+          "values": [
+            "0",
+            "1",
+            "2",
+            "3"
+          ],
+          "description": "Control how warnings about invalid settings are issued:\n0=disabled,\n1=background tasks (boot, resume, change of power source) report to syslog,\n2=shell commands report to the terminal (stderr),\n3=combination of 1 and 2"
+        },
+        {
+          "key": "TLP_MSG_COLORS",
+          "group": "TLP_MSG_COLORS",
+          "type": "text",
+          "placeholder": "TLP configuration value",
+          "description": "Colorize error, warning, notice and success messages.\nColors are specified with ANSI codes:\n1=bold black, 90=grey, 91=red, 92=green, 93=yellow, 94=blue, 95=magenta, 96=cyan, 97=white.\nOther colors are possible, refer to:\nhttps://en.wikipedia.org/wiki/ANSI_escape_code#3-bit_and_4-bit\nColors must be specified in the order \"error, warning, notice, success\".\nBy default, errors are shown in red, warnings in yellow, notices in bold and success in green"
+        },
+        {
+          "key": "TLP_AUTO_SWITCH",
+          "group": "TLP_AUTO_SWITCH",
+          "type": "select",
+          "values": [
+            "0",
+            "1",
+            "2"
+          ],
+          "description": "Control automatic switching of the power profile when connecting or removing\nthe charger, when booting the system or when executing 'tlp start':\n0=disabled - never switch, use TLP_DEFAULT_MODE if configured\n1=auto - always switch, select performance on AC and\nbalanced on battery power.\n2=smart - do not switch if the following profiles were active previously:\npower-saver or balanced on AC resp.\npower-saver or performance on battery power.\nNote: the same applies if the charger was connected/removed during suspend"
+        },
+        {
+          "key": "TLP_PROFILE_AC",
+          "group": "TLP_PROFILE",
+          "type": "select",
+          "values": [
+            "AC",
+            "PRF",
+            "BAT",
+            "BAL",
+            "SAV"
+          ],
+          "profile": "AC"
+        },
+        {
+          "key": "TLP_PROFILE_BAT",
+          "group": "TLP_PROFILE",
+          "type": "select",
+          "values": [
+            "AC",
+            "PRF",
+            "BAT",
+            "BAL",
+            "SAV"
+          ],
+          "profile": "BAT"
+        },
+        {
+          "key": "TLP_PROFILE_DEFAULT",
+          "group": "TLP_PROFILE",
+          "type": "select",
+          "values": [
+            "AC",
+            "PRF",
+            "BAT",
+            "BAL",
+            "SAV"
+          ],
+          "profile": "DEFAULT"
+        },
+        {
+          "key": "TLP_PS_IGNORE",
+          "group": "TLP_PS_IGNORE",
+          "type": "list",
+          "values": [
+            "AC",
+            "USB",
+            "BAT"
+          ],
+          "description": "Power supply classes to ignore when determining operation mode: AC, USB, BAT.\nSeparate multiple classes with spaces.\nNote: try on laptops where operation mode AC/BAT is incorrectly detected"
+        }
+      ],
+      "id": "general",
+      "icon": "tune",
+      "waffleIcon": "settings-cog-multiple",
+      "groups": [
+        {
+          "id": "TLP_ENABLE",
+          "title": "TLP ENABLE",
+          "description": "Turn TLP power management on or off."
+        },
+        {
+          "id": "TLP_DISABLE_DEFAULTS",
+          "title": "TLP DISABLE DEFAULTS",
+          "description": "Use only settings explicitly enabled below. Leave this off unless you want a fully manual TLP configuration."
+        },
+        {
+          "id": "TLP_WARN_LEVEL",
+          "title": "TLP WARN LEVEL",
+          "description": "Choose where TLP reports configuration warnings."
+        },
+        {
+          "id": "TLP_MSG_COLORS",
+          "title": "TLP MSG COLORS",
+          "description": "ANSI color codes for error, warning, notice, and success messages, in that order."
+        },
+        {
+          "id": "TLP_AUTO_SWITCH",
+          "title": "TLP AUTO SWITCH",
+          "description": "Select how TLP switches profiles when the power source changes."
+        },
+        {
+          "id": "TLP_PROFILE",
+          "title": "TLP PROFILE",
+          "description": "Map AC, battery, and fallback states to TLP profiles. AC/BAT remain available as legacy aliases."
+        },
+        {
+          "id": "TLP_PS_IGNORE",
+          "title": "TLP PS IGNORE",
+          "description": "Ignore selected power-supply classes when TLP detects AC or battery mode. Use only if detection is wrong."
+        }
+      ]
+    },
+    {
+      "name": "Audio",
+      "description": "Audio controller power saving on AC and battery.",
+      "settings": [
+        {
+          "key": "SOUND_POWER_SAVE_ON_AC",
+          "group": "SOUND_POWER_SAVE",
+          "type": "number",
+          "min": 0,
+          "max": 3600,
+          "step": 1,
+          "profile": "AC",
+          "unit": "s"
+        },
+        {
+          "key": "SOUND_POWER_SAVE_ON_BAT",
+          "group": "SOUND_POWER_SAVE",
+          "type": "number",
+          "min": 0,
+          "max": 3600,
+          "step": 1,
+          "profile": "BAT",
+          "unit": "s"
+        },
+        {
+          "key": "SOUND_POWER_SAVE_CONTROLLER",
+          "group": "SOUND_POWER_SAVE_CONTROLLER",
+          "type": "select",
+          "values": [
+            "N",
+            "Y"
+          ],
+          "description": "Disable controller too (HDA only): Y/N.\nNote: effective only when SOUND_POWER_SAVE_ON_AC/BAT is activated"
+        }
+      ],
+      "id": "audio",
+      "icon": "volume_up",
+      "waffleIcon": "speaker",
+      "groups": [
+        {
+          "id": "SOUND_POWER_SAVE",
+          "title": "SOUND POWER SAVE",
+          "description": "Intel HDA/AC97 audio · Set the idle timeout before power saving; 0 disables it."
+        },
+        {
+          "id": "SOUND_POWER_SAVE_CONTROLLER",
+          "title": "SOUND POWER SAVE CONTROLLER",
+          "description": "HDA only · Power down the controller when audio power saving is active."
+        }
+      ]
+    },
+    {
+      "name": "Disks",
+      "description": "Disk idle, APM, I/O scheduler, SATA and AHCI runtime power.",
+      "settings": [
+        {
+          "key": "DISK_IDLE_SECS_ON_AC",
+          "group": "DISK_IDLE_SECS",
+          "type": "number",
+          "min": 0,
+          "max": 1000,
+          "step": 1,
+          "profile": "AC",
+          "unit": "s"
+        },
+        {
+          "key": "DISK_IDLE_SECS_ON_BAT",
+          "group": "DISK_IDLE_SECS",
+          "type": "number",
+          "min": 0,
+          "max": 1000,
+          "step": 1,
+          "profile": "BAT",
+          "unit": "s"
+        },
+        {
+          "key": "MAX_LOST_WORK_SECS_ON_AC",
+          "group": "MAX_LOST_WORK_SECS",
+          "type": "number",
+          "min": 0,
+          "max": 10000,
+          "step": 1,
+          "profile": "AC",
+          "unit": "s"
+        },
+        {
+          "key": "MAX_LOST_WORK_SECS_ON_BAT",
+          "group": "MAX_LOST_WORK_SECS",
+          "type": "number",
+          "min": 0,
+          "max": 10000,
+          "step": 1,
+          "profile": "BAT",
+          "unit": "s"
+        },
+        {
+          "key": "DISK_DEVICES",
+          "group": "DISK_DEVICES",
+          "type": "text",
+          "placeholder": "Space-separated device identifiers",
+          "description": "Define disk devices on which the following DISK/AHCI_RUNTIME parameters act.\nSeparate multiple devices with spaces.\nDevices can be specified by disk ID also (lookup with: tlp diskid)"
+        },
+        {
+          "key": "DISK_APM_LEVEL_ON_AC",
+          "group": "DISK_APM_LEVEL",
+          "type": "text",
+          "itemMin": 1,
+          "itemMax": 255,
+          "placeholder": "Space-separated values matching DISK_DEVICES",
+          "profile": "AC"
+        },
+        {
+          "key": "DISK_APM_LEVEL_ON_BAT",
+          "group": "DISK_APM_LEVEL",
+          "type": "text",
+          "itemMin": 1,
+          "itemMax": 255,
+          "placeholder": "Space-separated values matching DISK_DEVICES",
+          "profile": "BAT"
+        },
+        {
+          "key": "DISK_APM_CLASS_DENYLIST",
+          "group": "DISK_APM_CLASS_DENYLIST",
+          "type": "list",
+          "values": [
+            "sata",
+            "ata",
+            "usb",
+            "ieee1394"
+          ],
+          "description": "Exclude disk classes from advanced power management (APM):\n- sata, ata, usb, ieee1394.\nSeparate multiple classes with spaces.\nCAUTION: USB and IEEE1394 disks may fail to mount or data may get corrupted with APM enabled.\nBe careful and make sure you have backups of all affected media before removing 'usb' or 'ieee1394' from the denylist(!)"
+        },
+        {
+          "key": "DISK_SPINDOWN_TIMEOUT_ON_AC",
+          "group": "DISK_SPINDOWN_TIMEOUT",
+          "type": "text",
+          "itemMin": 0,
+          "itemMax": 251,
+          "placeholder": "Space-separated values matching DISK_DEVICES",
+          "profile": "AC"
+        },
+        {
+          "key": "DISK_SPINDOWN_TIMEOUT_ON_BAT",
+          "group": "DISK_SPINDOWN_TIMEOUT",
+          "type": "text",
+          "itemMin": 0,
+          "itemMax": 251,
+          "placeholder": "Space-separated values matching DISK_DEVICES",
+          "profile": "BAT"
+        },
+        {
+          "key": "DISK_IOSCHED",
+          "group": "DISK_IOSCHED",
+          "type": "text",
+          "itemValues": [
+            "mq-deadline",
+            "none",
+            "kyber",
+            "bfq",
+            "deadline",
+            "cfq",
+            "noop"
+          ],
+          "placeholder": "Space-separated values matching DISK_DEVICES",
+          "description": "Select io scheduler for the disk devices: noop/deadline/cfq (Default: cfq)\nSeparate values for multiple devices with spaces"
+        },
+        {
+          "key": "SATA_LINKPWR_ON_AC",
+          "group": "SATA_LINKPWR",
+          "type": "list",
+          "values": [
+            "min_power",
+            "med_power_with_dipm",
+            "medium_power",
+            "max_performance"
+          ],
+          "profile": "AC"
+        },
+        {
+          "key": "SATA_LINKPWR_ON_BAT",
+          "group": "SATA_LINKPWR",
+          "type": "list",
+          "values": [
+            "min_power",
+            "med_power_with_dipm",
+            "medium_power",
+            "max_performance"
+          ],
+          "profile": "BAT"
+        },
+        {
+          "key": "SATA_LINKPWR_DENYLIST",
+          "group": "SATA_LINKPWR_DENYLIST",
+          "type": "text",
+          "placeholder": "TLP configuration value",
+          "description": "Exclude SATA links from AHCI link power management (ALPM).\nSATA links are specified by their host. Refer to the output of\ntlp-stat -d to determine the host; the format is \"hostX\".\nSeparate multiple hosts with spaces"
+        },
+        {
+          "key": "AHCI_RUNTIME_PM_ON_AC",
+          "group": "AHCI_RUNTIME_PM",
+          "type": "select",
+          "values": [
+            "on",
+            "auto"
+          ],
+          "profile": "AC"
+        },
+        {
+          "key": "AHCI_RUNTIME_PM_ON_BAT",
+          "group": "AHCI_RUNTIME_PM",
+          "type": "select",
+          "values": [
+            "on",
+            "auto"
+          ],
+          "profile": "BAT"
+        },
+        {
+          "key": "AHCI_RUNTIME_PM_TIMEOUT",
+          "group": "AHCI_RUNTIME_PM_TIMEOUT",
+          "type": "number",
+          "min": 0,
+          "max": 10000,
+          "step": 1,
+          "description": "Seconds of inactivity before disk is suspended",
+          "unit": "s"
+        },
+        {
+          "key": "BAY_POWEROFF_ON_AC",
+          "group": "BAY_POWEROFF",
+          "type": "select",
+          "values": [
+            "0",
+            "1"
+          ],
+          "profile": "AC"
+        },
+        {
+          "key": "BAY_POWEROFF_ON_BAT",
+          "group": "BAY_POWEROFF",
+          "type": "select",
+          "values": [
+            "0",
+            "1"
+          ],
+          "profile": "BAT"
+        },
+        {
+          "key": "BAY_DEVICE",
+          "group": "BAY_DEVICE",
+          "type": "text",
+          "placeholder": "TLP configuration value",
+          "description": "Optical drive device to power off (default sr0)"
+        }
+      ],
+      "id": "disks",
+      "icon": "hard_drive",
+      "waffleIcon": "desktop",
+      "groups": [
+        {
+          "id": "DISK_IDLE_SECS",
+          "title": "DISK IDLE SECS",
+          "description": "Delay before syncing an idle disk; 0 disables laptop mode."
+        },
+        {
+          "id": "MAX_LOST_WORK_SECS",
+          "title": "MAX LOST WORK SECS",
+          "description": "Maximum age of dirty pages before they are written to disk."
+        },
+        {
+          "id": "DISK_DEVICES",
+          "title": "DISK DEVICES",
+          "description": "Target disks for disk and AHCI settings. Separate device names or tlp diskid IDs with spaces."
+        },
+        {
+          "id": "DISK_APM_LEVEL",
+          "title": "DISK APM LEVEL",
+          "description": "Hard-disk APM level per device. Lower values save more power; 255 disables APM. Levels 1–127 may spin disks down."
+        },
+        {
+          "id": "DISK_APM_CLASS_DENYLIST",
+          "title": "DISK APM CLASS DENYLIST",
+          "description": "Disk classes excluded from APM. Keep USB and IEEE 1394 excluded unless you understand the data-loss risk."
+        },
+        {
+          "id": "DISK_SPINDOWN_TIMEOUT",
+          "title": "DISK SPINDOWN TIMEOUT",
+          "description": "Hard-disk spin-down timeout in hdparm units; 0 disables spin-down."
+        },
+        {
+          "id": "DISK_IOSCHED",
+          "title": "DISK IOSCHED",
+          "description": "I/O scheduler per target disk. Separate multiple values with spaces."
+        },
+        {
+          "id": "SATA_LINKPWR",
+          "title": "SATA LINKPWR",
+          "description": "SATA/AHCI link power policy. Aggressive modes save more power but may reduce compatibility."
+        },
+        {
+          "id": "SATA_LINKPWR_DENYLIST",
+          "title": "SATA LINKPWR DENYLIST",
+          "description": "SATA hosts excluded from link power management. Find host names with tlp-stat -d."
+        },
+        {
+          "id": "AHCI_RUNTIME_PM",
+          "title": "AHCI RUNTIME PM",
+          "description": "Runtime power management for NVMe, SATA, ATA, USB disks, and SATA ports."
+        },
+        {
+          "id": "AHCI_RUNTIME_PM_TIMEOUT",
+          "title": "AHCI RUNTIME PM TIMEOUT",
+          "description": "Idle time before managed disks enter runtime suspend."
+        },
+        {
+          "id": "BAY_POWEROFF",
+          "title": "BAY POWEROFF",
+          "description": "Power off supported optical drives in UltraBay/MediaBay. Hard disks are never powered off."
+        },
+        {
+          "id": "BAY_DEVICE",
+          "title": "BAY DEVICE",
+          "description": "Optical-drive device to power off, usually sr0."
+        }
+      ]
+    },
+    {
+      "name": "Graphics",
+      "description": "Intel and AMD graphics power and frequency policy.",
+      "settings": [
+        {
+          "key": "INTEL_GPU_POWER_PROFILE_ON_AC",
+          "group": "INTEL_GPU_POWER_PROFILE",
+          "type": "select",
+          "values": [
+            "base",
+            "power_saving"
+          ],
+          "profile": "AC"
+        },
+        {
+          "key": "INTEL_GPU_POWER_PROFILE_ON_BAT",
+          "group": "INTEL_GPU_POWER_PROFILE",
+          "type": "select",
+          "values": [
+            "base",
+            "power_saving"
+          ],
+          "profile": "BAT"
+        },
+        {
+          "key": "INTEL_GPU_POWER_PROFILE_ON_SAV",
+          "group": "INTEL_GPU_POWER_PROFILE",
+          "type": "select",
+          "values": [
+            "base",
+            "power_saving"
+          ],
+          "profile": "SAV"
+        },
+        {
+          "key": "INTEL_GPU_MIN_FREQ_ON_AC",
+          "group": "INTEL_GPU_FREQ",
+          "type": "number",
+          "min": 0,
+          "max": 5000,
+          "step": 1,
+          "profile": "AC",
+          "unit": "MHz"
+        },
+        {
+          "key": "INTEL_GPU_MIN_FREQ_ON_BAT",
+          "group": "INTEL_GPU_FREQ",
+          "type": "number",
+          "min": 0,
+          "max": 5000,
+          "step": 1,
+          "profile": "BAT",
+          "unit": "MHz"
+        },
+        {
+          "key": "INTEL_GPU_MIN_FREQ_ON_SAV",
+          "group": "INTEL_GPU_FREQ",
+          "type": "number",
+          "min": 0,
+          "max": 5000,
+          "step": 1,
+          "profile": "SAV",
+          "unit": "MHz"
+        },
+        {
+          "key": "INTEL_GPU_MAX_FREQ_ON_AC",
+          "group": "INTEL_GPU_FREQ",
+          "type": "number",
+          "min": 0,
+          "max": 5000,
+          "step": 1,
+          "profile": "AC",
+          "unit": "MHz"
+        },
+        {
+          "key": "INTEL_GPU_MAX_FREQ_ON_BAT",
+          "group": "INTEL_GPU_FREQ",
+          "type": "number",
+          "min": 0,
+          "max": 5000,
+          "step": 1,
+          "profile": "BAT",
+          "unit": "MHz"
+        },
+        {
+          "key": "INTEL_GPU_MAX_FREQ_ON_SAV",
+          "group": "INTEL_GPU_FREQ",
+          "type": "number",
+          "min": 0,
+          "max": 5000,
+          "step": 1,
+          "profile": "SAV",
+          "unit": "MHz"
+        },
+        {
+          "key": "INTEL_GPU_BOOST_FREQ_ON_AC",
+          "group": "INTEL_GPU_FREQ",
+          "type": "number",
+          "min": 0,
+          "max": 5000,
+          "step": 1,
+          "profile": "AC",
+          "unit": "MHz"
+        },
+        {
+          "key": "INTEL_GPU_BOOST_FREQ_ON_BAT",
+          "group": "INTEL_GPU_FREQ",
+          "type": "number",
+          "min": 0,
+          "max": 5000,
+          "step": 1,
+          "profile": "BAT",
+          "unit": "MHz"
+        },
+        {
+          "key": "INTEL_GPU_BOOST_FREQ_ON_SAV",
+          "group": "INTEL_GPU_FREQ",
+          "type": "number",
+          "min": 0,
+          "max": 5000,
+          "step": 1,
+          "profile": "SAV",
+          "unit": "MHz"
+        },
+        {
+          "key": "RADEON_DPM_PERF_LEVEL_ON_AC",
+          "group": "RADEON_DPM_PERF_LEVEL",
+          "type": "select",
+          "values": [
+            "auto",
+            "low",
+            "high"
+          ],
+          "profile": "AC"
+        },
+        {
+          "key": "RADEON_DPM_PERF_LEVEL_ON_BAT",
+          "group": "RADEON_DPM_PERF_LEVEL",
+          "type": "select",
+          "values": [
+            "auto",
+            "low",
+            "high"
+          ],
+          "profile": "BAT"
+        },
+        {
+          "key": "RADEON_DPM_PERF_LEVEL_ON_SAV",
+          "group": "RADEON_DPM_PERF_LEVEL",
+          "type": "select",
+          "values": [
+            "auto",
+            "low",
+            "high"
+          ],
+          "profile": "SAV"
+        },
+        {
+          "key": "AMDGPU_ABM_LEVEL_ON_AC",
+          "group": "AMDGPU_ABM_LEVEL",
+          "type": "number",
+          "min": 0,
+          "max": 4,
+          "step": 1,
+          "profile": "AC"
+        },
+        {
+          "key": "AMDGPU_ABM_LEVEL_ON_BAT",
+          "group": "AMDGPU_ABM_LEVEL",
+          "type": "number",
+          "min": 0,
+          "max": 4,
+          "step": 1,
+          "profile": "BAT"
+        },
+        {
+          "key": "AMDGPU_ABM_LEVEL_ON_SAV",
+          "group": "AMDGPU_ABM_LEVEL",
+          "type": "number",
+          "min": 0,
+          "max": 4,
+          "step": 1,
+          "profile": "SAV"
+        }
+      ],
+      "id": "graphics",
+      "icon": "monitor",
+      "waffleIcon": "desktop",
+      "groups": [
+        {
+          "id": "INTEL_GPU_POWER_PROFILE",
+          "title": "INTEL GPU POWER PROFILE",
+          "description": "Intel Xe only · Select the xe-driver power profile."
+        },
+        {
+          "id": "INTEL_GPU_FREQ",
+          "title": "INTEL GPU FREQ",
+          "description": "Intel only · Set supported GPU min, max, and boost frequencies. Check tlp-stat -g."
+        },
+        {
+          "id": "RADEON_DPM_PERF_LEVEL",
+          "title": "RADEON DPM PERF LEVEL",
+          "description": "AMD only · Select the DPM level for amdgpu/radeon; Automatic is recommended."
+        },
+        {
+          "id": "AMDGPU_ABM_LEVEL",
+          "title": "AMDGPU ABM LEVEL",
+          "description": "AMD Vega+ only · Set panel ABM strength. Higher levels save more power but may affect color."
+        }
+      ]
+    },
+    {
+      "name": "Network",
+      "description": "Wi-Fi power saving and Wake-on-LAN.",
+      "settings": [
+        {
+          "key": "WIFI_PWR_ON_AC",
+          "group": "WIFI_PWR",
+          "type": "select",
+          "values": [
+            "off",
+            "on"
+          ],
+          "profile": "AC"
+        },
+        {
+          "key": "WIFI_PWR_ON_BAT",
+          "group": "WIFI_PWR",
+          "type": "select",
+          "values": [
+            "off",
+            "on"
+          ],
+          "profile": "BAT"
+        },
+        {
+          "key": "WOL_DISABLE",
+          "group": "WOL_DISABLE",
+          "type": "select",
+          "values": [
+            "N",
+            "Y"
+          ],
+          "description": "Disable wake on LAN"
+        }
+      ],
+      "id": "network",
+      "icon": "wifi",
+      "waffleIcon": "wifi-3",
+      "groups": [
+        {
+          "id": "WIFI_PWR",
+          "title": "WIFI PWR",
+          "description": "Wi-Fi power-saving policy for AC and battery profiles."
+        },
+        {
+          "id": "WOL_DISABLE",
+          "title": "WOL DISABLE",
+          "description": "Disable Wake-on-LAN to reduce idle network power."
+        }
+      ]
+    },
+    {
+      "name": "PCIe",
+      "description": "PCIe ASPM and runtime power management.",
+      "settings": [
+        {
+          "key": "PCIE_ASPM_ON_AC",
+          "group": "PCIE_ASPM",
+          "type": "select",
+          "values": [
+            "default",
+            "performance",
+            "powersave",
+            "powersupersave"
+          ],
+          "profile": "AC"
+        },
+        {
+          "key": "PCIE_ASPM_ON_BAT",
+          "group": "PCIE_ASPM",
+          "type": "select",
+          "values": [
+            "default",
+            "performance",
+            "powersave",
+            "powersupersave"
+          ],
+          "profile": "BAT"
+        },
+        {
+          "key": "PCIE_ASPM_ON_SAV",
+          "group": "PCIE_ASPM",
+          "type": "select",
+          "values": [
+            "default",
+            "performance",
+            "powersave",
+            "powersupersave"
+          ],
+          "profile": "SAV"
+        },
+        {
+          "key": "RUNTIME_PM_ON_AC",
+          "group": "RUNTIME_PM",
+          "type": "select",
+          "values": [
+            "on",
+            "auto"
+          ],
+          "profile": "AC"
+        },
+        {
+          "key": "RUNTIME_PM_ON_BAT",
+          "group": "RUNTIME_PM",
+          "type": "select",
+          "values": [
+            "on",
+            "auto"
+          ],
+          "profile": "BAT"
+        },
+        {
+          "key": "RUNTIME_PM_DENYLIST",
+          "group": "RUNTIME_PM_DENYLIST",
+          "type": "text",
+          "placeholder": "Space-separated device identifiers",
+          "description": "Exclude listed PCIe device adresses from Runtime PM.\nNote: this preserves the kernel driver default, to force a certain state\n- use RUNTIME_PM_ENABLE/DISABLE instead.\nSeparate multiple addresses with spaces.\nUse lspci to get the addresses (1st column)"
+        },
+        {
+          "key": "RUNTIME_PM_DRIVER_DENYLIST",
+          "group": "RUNTIME_PM_DRIVER_DENYLIST",
+          "type": "text",
+          "placeholder": "TLP configuration value",
+          "description": "Exclude PCIe devices assigned to the listed drivers from Runtime PM.\nNote: this preserves the kernel driver default, to force a certain state\n- use RUNTIME_PM_ENABLE/DISABLE instead.\nSeparate multiple drivers with spaces.\nLeave empty to disable completely"
+        },
+        {
+          "key": "RUNTIME_PM_ENABLE",
+          "group": "RUNTIME_PM_DEVICE",
+          "type": "text",
+          "placeholder": "TLP configuration value"
+        },
+        {
+          "key": "RUNTIME_PM_DISABLE",
+          "group": "RUNTIME_PM_DEVICE",
+          "type": "text",
+          "placeholder": "TLP configuration value"
+        }
+      ],
+      "id": "pcie",
+      "icon": "device_hub",
+      "waffleIcon": "device-eq",
+      "groups": [
+        {
+          "id": "PCIE_ASPM",
+          "title": "PCIE ASPM",
+          "description": "PCIe link power policy. System default is the safest choice."
+        },
+        {
+          "id": "RUNTIME_PM",
+          "title": "RUNTIME PM",
+          "description": "Runtime power management for PCIe devices."
+        },
+        {
+          "id": "RUNTIME_PM_DENYLIST",
+          "title": "RUNTIME PM DENYLIST",
+          "description": "PCIe addresses excluded from Runtime PM. Find addresses with lspci."
+        },
+        {
+          "id": "RUNTIME_PM_DRIVER_DENYLIST",
+          "title": "RUNTIME PM DRIVER DENYLIST",
+          "description": "Exclude all PCIe devices using listed drivers. Separate driver names with spaces."
+        },
+        {
+          "id": "RUNTIME_PM_DEVICE",
+          "title": "RUNTIME PM DEVICE",
+          "description": "Force Runtime PM on or off for listed PCIe addresses. These rules take priority."
+        }
+      ]
+    },
+    {
+      "name": "Processor",
+      "description": "Intel and AMD CPU drivers, governors, boost, and platform profiles.",
+      "settings": [
+        {
+          "key": "CPU_DRIVER_OPMODE_ON_AC",
+          "group": "CPU_DRIVER_OPMODE",
+          "type": "select",
+          "values": [
+            "active",
+            "passive",
+            "guided"
+          ],
+          "profile": "AC"
+        },
+        {
+          "key": "CPU_DRIVER_OPMODE_ON_BAT",
+          "group": "CPU_DRIVER_OPMODE",
+          "type": "select",
+          "values": [
+            "active",
+            "passive",
+            "guided"
+          ],
+          "profile": "BAT"
+        },
+        {
+          "key": "CPU_DRIVER_OPMODE_ON_SAV",
+          "group": "CPU_DRIVER_OPMODE",
+          "type": "select",
+          "values": [
+            "active",
+            "passive",
+            "guided"
+          ],
+          "profile": "SAV"
+        },
+        {
+          "key": "CPU_SCALING_GOVERNOR_ON_AC",
+          "group": "CPU_SCALING_GOVERNOR",
+          "type": "select",
+          "values": [
+            "ondemand",
+            "powersave",
+            "performance",
+            "conservative",
+            "schedutil"
+          ],
+          "profile": "AC"
+        },
+        {
+          "key": "CPU_SCALING_GOVERNOR_ON_BAT",
+          "group": "CPU_SCALING_GOVERNOR",
+          "type": "select",
+          "values": [
+            "ondemand",
+            "powersave",
+            "performance",
+            "conservative",
+            "schedutil"
+          ],
+          "profile": "BAT"
+        },
+        {
+          "key": "CPU_SCALING_GOVERNOR_ON_SAV",
+          "group": "CPU_SCALING_GOVERNOR",
+          "type": "select",
+          "values": [
+            "ondemand",
+            "powersave",
+            "performance",
+            "conservative",
+            "schedutil"
+          ],
+          "profile": "SAV"
+        },
+        {
+          "key": "CPU_SCALING_MIN_FREQ_ON_AC",
+          "group": "CPU_SCALING_FREQ",
+          "type": "text",
+          "placeholder": "TLP configuration value",
+          "profile": "AC"
+        },
+        {
+          "key": "CPU_SCALING_MAX_FREQ_ON_AC",
+          "group": "CPU_SCALING_FREQ",
+          "type": "text",
+          "placeholder": "TLP configuration value",
+          "profile": "AC"
+        },
+        {
+          "key": "CPU_SCALING_MIN_FREQ_ON_BAT",
+          "group": "CPU_SCALING_FREQ",
+          "type": "text",
+          "placeholder": "TLP configuration value",
+          "profile": "BAT"
+        },
+        {
+          "key": "CPU_SCALING_MAX_FREQ_ON_BAT",
+          "group": "CPU_SCALING_FREQ",
+          "type": "text",
+          "placeholder": "TLP configuration value",
+          "profile": "BAT"
+        },
+        {
+          "key": "CPU_SCALING_MIN_FREQ_ON_SAV",
+          "group": "CPU_SCALING_FREQ",
+          "type": "text",
+          "placeholder": "TLP configuration value",
+          "profile": "SAV"
+        },
+        {
+          "key": "CPU_SCALING_MAX_FREQ_ON_SAV",
+          "group": "CPU_SCALING_FREQ",
+          "type": "text",
+          "placeholder": "TLP configuration value",
+          "profile": "SAV"
+        },
+        {
+          "key": "CPU_ENERGY_PERF_POLICY_ON_AC",
+          "group": "CPU_ENERGY_PERF_POLICY",
+          "type": "select",
+          "values": [
+            "default",
+            "performance",
+            "balance_performance",
+            "balance_power",
+            "power"
+          ],
+          "profile": "AC"
+        },
+        {
+          "key": "CPU_ENERGY_PERF_POLICY_ON_BAT",
+          "group": "CPU_ENERGY_PERF_POLICY",
+          "type": "select",
+          "values": [
+            "default",
+            "performance",
+            "balance_performance",
+            "balance_power",
+            "power"
+          ],
+          "profile": "BAT"
+        },
+        {
+          "key": "CPU_ENERGY_PERF_POLICY_ON_SAV",
+          "group": "CPU_ENERGY_PERF_POLICY",
+          "type": "select",
+          "values": [
+            "default",
+            "performance",
+            "balance_performance",
+            "balance_power",
+            "power"
+          ],
+          "profile": "SAV"
+        },
+        {
+          "key": "CPU_MIN_PERF_ON_AC",
+          "group": "CPU_PERF",
+          "type": "number",
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "profile": "AC",
+          "unit": "%"
+        },
+        {
+          "key": "CPU_MAX_PERF_ON_AC",
+          "group": "CPU_PERF",
+          "type": "number",
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "profile": "AC",
+          "unit": "%"
+        },
+        {
+          "key": "CPU_MIN_PERF_ON_BAT",
+          "group": "CPU_PERF",
+          "type": "number",
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "profile": "BAT",
+          "unit": "%"
+        },
+        {
+          "key": "CPU_MAX_PERF_ON_BAT",
+          "group": "CPU_PERF",
+          "type": "number",
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "profile": "BAT",
+          "unit": "%"
+        },
+        {
+          "key": "CPU_MIN_PERF_ON_SAV",
+          "group": "CPU_PERF",
+          "type": "number",
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "profile": "SAV",
+          "unit": "%"
+        },
+        {
+          "key": "CPU_MAX_PERF_ON_SAV",
+          "group": "CPU_PERF",
+          "type": "number",
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "profile": "SAV",
+          "unit": "%"
+        },
+        {
+          "key": "CPU_BOOST_ON_AC",
+          "group": "CPU_BOOST",
+          "type": "select",
+          "values": [
+            "0",
+            "1"
+          ],
+          "profile": "AC"
+        },
+        {
+          "key": "CPU_BOOST_ON_BAT",
+          "group": "CPU_BOOST",
+          "type": "select",
+          "values": [
+            "0",
+            "1"
+          ],
+          "profile": "BAT"
+        },
+        {
+          "key": "CPU_BOOST_ON_SAV",
+          "group": "CPU_BOOST",
+          "type": "select",
+          "values": [
+            "0",
+            "1"
+          ],
+          "profile": "SAV"
+        },
+        {
+          "key": "CPU_HWP_DYN_BOOST_ON_AC",
+          "group": "CPU_HWP_DYN_BOOST",
+          "type": "select",
+          "values": [
+            "0",
+            "1"
+          ],
+          "profile": "AC"
+        },
+        {
+          "key": "CPU_HWP_DYN_BOOST_ON_BAT",
+          "group": "CPU_HWP_DYN_BOOST",
+          "type": "select",
+          "values": [
+            "0",
+            "1"
+          ],
+          "profile": "BAT"
+        },
+        {
+          "key": "CPU_HWP_DYN_BOOST_ON_SAV",
+          "group": "CPU_HWP_DYN_BOOST",
+          "type": "select",
+          "values": [
+            "0",
+            "1"
+          ],
+          "profile": "SAV"
+        },
+        {
+          "key": "NMI_WATCHDOG",
+          "group": "NMI_WATCHDOG",
+          "type": "select",
+          "values": [
+            "0",
+            "1"
+          ],
+          "description": "Kernel NMI Watchdog\noff: saves power, on: for kernel debugging only"
+        },
+        {
+          "key": "PLATFORM_PROFILE_ON_AC",
+          "group": "PLATFORM_PROFILE",
+          "type": "select",
+          "values": [
+            "performance",
+            "balanced",
+            "low-power"
+          ],
+          "multipleFromVersion": "1.11",
+          "profile": "AC"
+        },
+        {
+          "key": "PLATFORM_PROFILE_ON_BAT",
+          "group": "PLATFORM_PROFILE",
+          "type": "select",
+          "values": [
+            "performance",
+            "balanced",
+            "low-power"
+          ],
+          "multipleFromVersion": "1.11",
+          "profile": "BAT"
+        },
+        {
+          "key": "PLATFORM_PROFILE_ON_SAV",
+          "group": "PLATFORM_PROFILE",
+          "type": "select",
+          "values": [
+            "performance",
+            "balanced",
+            "low-power"
+          ],
+          "multipleFromVersion": "1.11",
+          "profile": "SAV"
+        },
+        {
+          "key": "MEM_SLEEP_ON_AC",
+          "group": "MEM_SLEEP",
+          "type": "select",
+          "values": [
+            "s2idle",
+            "deep"
+          ],
+          "profile": "AC"
+        },
+        {
+          "key": "MEM_SLEEP_ON_BAT",
+          "group": "MEM_SLEEP",
+          "type": "select",
+          "values": [
+            "s2idle",
+            "deep"
+          ],
+          "profile": "BAT"
+        }
+      ],
+      "id": "processor",
+      "icon": "memory",
+      "waffleIcon": "settings-cog-multiple",
+      "groups": [
+        {
+          "id": "CPU_DRIVER_OPMODE",
+          "title": "CPU DRIVER OPMODE",
+          "description": "Intel/AMD · intel_pstate supports Active or Passive; amd-pstate may also support Guided."
+        },
+        {
+          "id": "CPU_SCALING_GOVERNOR",
+          "title": "CPU SCALING GOVERNOR",
+          "description": "Intel/AMD · Available governors depend on the active CPU driver. Check tlp-stat -p before changing defaults."
+        },
+        {
+          "id": "CPU_SCALING_FREQ",
+          "title": "CPU SCALING FREQ",
+          "description": "Intel/AMD · Set frequency limits supported by the active driver. With intel_pstate, prefer performance percentages."
+        },
+        {
+          "id": "CPU_ENERGY_PERF_POLICY",
+          "title": "CPU ENERGY PERF POLICY",
+          "description": "Intel only · Select the HWP/EPP or EPB energy policy. Check tlp-stat -p for support."
+        },
+        {
+          "id": "CPU_PERF",
+          "title": "CPU PERF",
+          "description": "Intel only · Limit CPU performance as a percentage. Requires intel_pstate or intel_cpufreq."
+        },
+        {
+          "id": "CPU_BOOST",
+          "title": "CPU BOOST",
+          "description": "Intel/AMD · Allow or block turbo boost. Enabled permits boost; it does not force it."
+        },
+        {
+          "id": "CPU_HWP_DYN_BOOST",
+          "title": "CPU HWP DYN BOOST",
+          "description": "Intel only · Dynamic HWP boost requires intel_pstate Active mode and a supported CPU."
+        },
+        {
+          "id": "NMI_WATCHDOG",
+          "title": "NMI WATCHDOG",
+          "description": "Disable to save a small amount of power; enable only for kernel debugging."
+        },
+        {
+          "id": "PLATFORM_PROFILE",
+          "title": "PLATFORM PROFILE",
+          "description": "Hardware-dependent · Balance performance, thermals, and fan behavior. Check tlp-stat -p."
+        },
+        {
+          "id": "MEM_SLEEP",
+          "title": "MEM SLEEP",
+          "description": "Suspend mode: s2idle wakes faster; deep usually saves more power. Keep the system default if unsure."
+        }
+      ]
+    },
+    {
+      "name": "Radio",
+      "description": "Bluetooth, Wi-Fi, WWAN and NFC state by power profile.",
+      "settings": [
+        {
+          "key": "DEVICES_TO_DISABLE_ON_STARTUP",
+          "group": "DEVICES_TO_DISABLE_ON_STARTUP",
+          "type": "list",
+          "values": [
+            "bluetooth",
+            "nfc",
+            "wifi",
+            "wwan"
+          ],
+          "description": "Radio devices to disable on startup: bluetooth wifi wwan"
+        },
+        {
+          "key": "DEVICES_TO_ENABLE_ON_STARTUP",
+          "group": "DEVICES_TO_ENABLE_ON_STARTUP",
+          "type": "list",
+          "values": [
+            "bluetooth",
+            "nfc",
+            "wifi",
+            "wwan"
+          ],
+          "description": "Radio devices to enable on startup: bluetooth wifi wwan"
+        },
+        {
+          "key": "DEVICES_TO_ENABLE_ON_AC",
+          "group": "DEVICES_TO_ENABLE_ON_AC",
+          "type": "list",
+          "values": [
+            "bluetooth",
+            "nfc",
+            "wifi",
+            "wwan"
+          ],
+          "description": "Radio devices to enable on AC: bluetooth, wifi, wwan",
+          "profile": "AC"
+        },
+        {
+          "key": "DEVICES_TO_DISABLE_ON_BAT",
+          "group": "DEVICES_TO_DISABLE_ON_BAT",
+          "type": "list",
+          "values": [
+            "bluetooth",
+            "nfc",
+            "wifi",
+            "wwan"
+          ],
+          "description": "Radio devices to disable on battery: bluetooth, wifi, wwan",
+          "profile": "BAT"
+        },
+        {
+          "key": "DEVICES_TO_DISABLE_ON_BAT_NOT_IN_USE",
+          "group": "DEVICES_TO_DISABLE_ON_BAT_NOT_IN_USE",
+          "type": "list",
+          "values": [
+            "bluetooth",
+            "nfc",
+            "wifi",
+            "wwan"
+          ],
+          "description": "Radio devices to disable on battery when not in use (not connected):\nbluetooth, wifi, wwan",
+          "profile": "BAT"
+        },
+        {
+          "key": "DEVICES_TO_DISABLE_ON_AC",
+          "group": "PROFILE_RADIO",
+          "type": "list",
+          "values": [
+            "bluetooth",
+            "nfc",
+            "wifi",
+            "wwan"
+          ],
+          "minVersion": "1.11",
+          "profile": "AC"
+        },
+        {
+          "key": "DEVICES_TO_DISABLE_ON_AC_NOT_IN_USE",
+          "group": "PROFILE_RADIO",
+          "type": "list",
+          "values": [
+            "bluetooth",
+            "nfc",
+            "wifi",
+            "wwan"
+          ],
+          "minVersion": "1.11",
+          "profile": "AC"
+        },
+        {
+          "key": "DEVICES_TO_ENABLE_ON_BAT",
+          "group": "PROFILE_RADIO",
+          "type": "list",
+          "values": [
+            "bluetooth",
+            "nfc",
+            "wifi",
+            "wwan"
+          ],
+          "minVersion": "1.11",
+          "profile": "BAT"
+        },
+        {
+          "key": "DEVICES_TO_ENABLE_ON_SAV",
+          "group": "PROFILE_RADIO",
+          "type": "list",
+          "values": [
+            "bluetooth",
+            "nfc",
+            "wifi",
+            "wwan"
+          ],
+          "minVersion": "1.11",
+          "profile": "SAV"
+        },
+        {
+          "key": "DEVICES_TO_DISABLE_ON_SAV",
+          "group": "PROFILE_RADIO",
+          "type": "list",
+          "values": [
+            "bluetooth",
+            "nfc",
+            "wifi",
+            "wwan"
+          ],
+          "minVersion": "1.11",
+          "profile": "SAV"
+        },
+        {
+          "key": "DEVICES_TO_DISABLE_ON_SAV_NOT_IN_USE",
+          "group": "PROFILE_RADIO",
+          "type": "list",
+          "values": [
+            "bluetooth",
+            "nfc",
+            "wifi",
+            "wwan"
+          ],
+          "minVersion": "1.11",
+          "profile": "SAV"
+        }
+      ],
+      "id": "radio",
+      "icon": "cell_tower",
+      "waffleIcon": "wifi-3",
+      "groups": [
+        {
+          "id": "DEVICES_TO_DISABLE_ON_STARTUP",
+          "title": "DEVICES TO DISABLE ON STARTUP",
+          "description": "Select radios TLP disables at startup."
+        },
+        {
+          "id": "DEVICES_TO_ENABLE_ON_STARTUP",
+          "title": "DEVICES TO ENABLE ON STARTUP",
+          "description": "Select radios TLP enables at startup."
+        },
+        {
+          "id": "DEVICES_TO_ENABLE_ON_AC",
+          "title": "DEVICES TO ENABLE ON AC",
+          "description": "Select radios TLP enables while connected to AC."
+        },
+        {
+          "id": "DEVICES_TO_DISABLE_ON_BAT",
+          "title": "DEVICES TO DISABLE ON BAT",
+          "description": "Select radios TLP disables on battery power."
+        },
+        {
+          "id": "DEVICES_TO_DISABLE_ON_BAT_NOT_IN_USE",
+          "title": "DEVICES TO DISABLE ON BAT NOT IN USE",
+          "description": "Disable selected radios on battery when they are not connected."
+        },
+        {
+          "id": "PROFILE_RADIO",
+          "title": "PROFILE RADIO",
+          "description": "TLP 1.11+ · Radio rules for Performance, Balanced, and Power saver profiles."
+        }
+      ]
+    },
+    {
+      "name": "Radio Wizard",
+      "description": "Radio switching on network, dock and undock events.",
+      "settings": [
+        {
+          "key": "DEVICES_TO_DISABLE_ON_LAN_CONNECT",
+          "group": "DEVICES_TO_DISABLE_ON_CONNECT",
+          "type": "list",
+          "values": [
+            "bluetooth",
+            "wifi",
+            "wwan"
+          ]
+        },
+        {
+          "key": "DEVICES_TO_DISABLE_ON_WIFI_CONNECT",
+          "group": "DEVICES_TO_DISABLE_ON_CONNECT",
+          "type": "list",
+          "values": [
+            "bluetooth",
+            "wifi",
+            "wwan"
+          ]
+        },
+        {
+          "key": "DEVICES_TO_DISABLE_ON_WWAN_CONNECT",
+          "group": "DEVICES_TO_DISABLE_ON_CONNECT",
+          "type": "list",
+          "values": [
+            "bluetooth",
+            "wifi",
+            "wwan"
+          ]
+        },
+        {
+          "key": "DEVICES_TO_ENABLE_ON_LAN_DISCONNECT",
+          "group": "DEVICES_TO_ENABLE_ON_DISCONNECT",
+          "type": "list",
+          "values": [
+            "bluetooth",
+            "wifi",
+            "wwan"
+          ]
+        },
+        {
+          "key": "DEVICES_TO_ENABLE_ON_WIFI_DISCONNECT",
+          "group": "DEVICES_TO_ENABLE_ON_DISCONNECT",
+          "type": "list",
+          "values": [
+            "bluetooth",
+            "wifi",
+            "wwan"
+          ]
+        },
+        {
+          "key": "DEVICES_TO_ENABLE_ON_WWAN_DISCONNECT",
+          "group": "DEVICES_TO_ENABLE_ON_DISCONNECT",
+          "type": "list",
+          "values": [
+            "bluetooth",
+            "wifi",
+            "wwan"
+          ]
+        },
+        {
+          "key": "DEVICES_TO_ENABLE_ON_DOCK",
+          "group": "DEVICES_ON_DOCK",
+          "type": "list",
+          "values": [
+            "bluetooth",
+            "wifi",
+            "wwan"
+          ]
+        },
+        {
+          "key": "DEVICES_TO_DISABLE_ON_DOCK",
+          "group": "DEVICES_ON_DOCK",
+          "type": "list",
+          "values": [
+            "bluetooth",
+            "wifi",
+            "wwan"
+          ]
+        },
+        {
+          "key": "DEVICES_TO_ENABLE_ON_UNDOCK",
+          "group": "DEVICES_ON_UNDOCK",
+          "type": "list",
+          "values": [
+            "bluetooth",
+            "wifi",
+            "wwan"
+          ]
+        },
+        {
+          "key": "DEVICES_TO_DISABLE_ON_UNDOCK",
+          "group": "DEVICES_ON_UNDOCK",
+          "type": "list",
+          "values": [
+            "bluetooth",
+            "wifi",
+            "wwan"
+          ]
+        }
+      ],
+      "id": "radio-device-wizard",
+      "icon": "settings_input_antenna",
+      "waffleIcon": "settings",
+      "groups": [
+        {
+          "id": "DEVICES_TO_DISABLE_ON_CONNECT",
+          "title": "DEVICES TO DISABLE ON CONNECT",
+          "description": "Disable selected radios when LAN, Wi-Fi, or WWAN connects."
+        },
+        {
+          "id": "DEVICES_TO_ENABLE_ON_DISCONNECT",
+          "title": "DEVICES TO ENABLE ON DISCONNECT",
+          "description": "Enable selected radios when LAN, Wi-Fi, or WWAN disconnects."
+        },
+        {
+          "id": "DEVICES_ON_DOCK",
+          "title": "DEVICES ON DOCK",
+          "description": "Choose radio changes applied when the laptop docks."
+        },
+        {
+          "id": "DEVICES_ON_UNDOCK",
+          "title": "DEVICES ON UNDOCK",
+          "description": "Choose radio changes applied when the laptop undocks."
+        }
+      ]
+    },
+    {
+      "name": "USB",
+      "description": "USB autosuspend and device inclusion/exclusion rules.",
+      "settings": [
+        {
+          "key": "USB_AUTOSUSPEND",
+          "group": "USB_AUTOSUSPEND",
+          "type": "select",
+          "values": [
+            "0",
+            "1"
+          ],
+          "description": "USB autosuspend feature"
+        },
+        {
+          "key": "USB_DENYLIST",
+          "group": "USB_DENYLIST",
+          "type": "text",
+          "placeholder": "Space-separated device identifiers",
+          "description": "Exclude listed devices from USB autosuspend (separate with spaces).\nUse lsusb to get the ids.\nNote: input devices (usbhid) and libsane-supported scanners are excluded automatically"
+        },
+        {
+          "key": "USB_EXCLUDE_AUDIO",
+          "group": "USB_EXCLUDE_AUDIO",
+          "type": "select",
+          "values": [
+            "0",
+            "1"
+          ],
+          "description": "Exclude audio devices from USB autosuspend:\n- 0=do not exclude, 1=exclude"
+        },
+        {
+          "key": "USB_EXCLUDE_BTUSB",
+          "group": "USB_EXCLUDE_BTUSB",
+          "type": "select",
+          "values": [
+            "0",
+            "1"
+          ],
+          "description": "Exclude bluetooth devices from USB autosuspend:\n- 0=do not exclude, 1=exclude"
+        },
+        {
+          "key": "USB_EXCLUDE_PHONE",
+          "group": "USB_EXCLUDE_PHONE",
+          "type": "select",
+          "values": [
+            "0",
+            "1"
+          ],
+          "description": "Exclude phone devices from USB autosuspend:\n- 0=do not exclude, 1=exclude (enable charging)"
+        },
+        {
+          "key": "USB_EXCLUDE_PRINTER",
+          "group": "USB_EXCLUDE_PRINTER",
+          "type": "select",
+          "values": [
+            "0",
+            "1"
+          ],
+          "description": "Exclude printers from USB autosuspend:\n- 0=do not exclude, 1=exclude"
+        },
+        {
+          "key": "USB_EXCLUDE_WWAN",
+          "group": "USB_EXCLUDE_WWAN",
+          "type": "select",
+          "values": [
+            "0",
+            "1"
+          ],
+          "description": "Exclude WWAN devices from USB autosuspend:\n- 0=do not exclude, 1=exclude"
+        },
+        {
+          "key": "USB_ALLOWLIST",
+          "group": "USB_ALLOWLIST",
+          "type": "text",
+          "placeholder": "Space-separated device identifiers",
+          "description": "Allow USB autosuspend for listed devices even if already denylisted or\nexcluded above (separate with spaces). Use lsusb to get the ids"
+        }
+      ],
+      "id": "usb",
+      "icon": "usb",
+      "waffleIcon": "device-eq",
+      "groups": [
+        {
+          "id": "USB_AUTOSUSPEND",
+          "title": "USB AUTOSUSPEND",
+          "description": "Suspend idle USB devices to reduce power use."
+        },
+        {
+          "id": "USB_DENYLIST",
+          "title": "USB DENYLIST",
+          "description": "USB IDs excluded from autosuspend. Find IDs with lsusb and separate them with spaces."
+        },
+        {
+          "id": "USB_EXCLUDE_AUDIO",
+          "title": "USB EXCLUDE AUDIO",
+          "description": "Keep USB audio devices awake."
+        },
+        {
+          "id": "USB_EXCLUDE_BTUSB",
+          "title": "USB EXCLUDE BTUSB",
+          "description": "Keep USB Bluetooth adapters awake."
+        },
+        {
+          "id": "USB_EXCLUDE_PHONE",
+          "title": "USB EXCLUDE PHONE",
+          "description": "Keep connected phones awake so they can continue charging."
+        },
+        {
+          "id": "USB_EXCLUDE_PRINTER",
+          "title": "USB EXCLUDE PRINTER",
+          "description": "Keep USB printers awake."
+        },
+        {
+          "id": "USB_EXCLUDE_WWAN",
+          "title": "USB EXCLUDE WWAN",
+          "description": "Keep USB WWAN adapters awake."
+        },
+        {
+          "id": "USB_ALLOWLIST",
+          "title": "USB ALLOWLIST",
+          "description": "USB IDs allowed to autosuspend even when another rule excludes them."
+        }
+      ]
+    },
+    {
+      "name": "Battery Care",
+      "description": "Charge thresholds and restoration behavior.",
+      "settings": [
+        {
+          "key": "RESTORE_THRESHOLDS_ON_BAT",
+          "group": "RESTORE_THRESHOLDS_ON_BAT",
+          "type": "select",
+          "values": [
+            "0",
+            "1"
+          ],
+          "description": "Restore charge thresholds when AC is unplugged",
+          "profile": "BAT"
+        }
+      ],
+      "id": "battery-care",
+      "icon": "battery_saver",
+      "waffleIcon": "battery-saver",
+      "groups": [
+        {
+          "id": "RESTORE_THRESHOLDS_ON_BAT",
+          "title": "RESTORE THRESHOLDS ON BAT",
+          "description": "Reapply configured charge thresholds after unplugging AC."
+        }
+      ]
+    }
+  ],
+  "descriptionAttribution": {
+    "source": "TLPUI configdescriptions.po",
+    "copyright": "Copyright (c) 2026 Daniel Christophis; descriptions adapted from TLP by Thomas Koch",
+    "license": "GPL-2.0-or-later"
+  }
+}

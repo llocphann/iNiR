@@ -1,0 +1,1734 @@
+#!/bin/sh
+
+# iNiR owns only this TLP drop-in. Hardware access and vendor semantics remain
+# TLP's responsibility.
+config_dir=/etc/tlp.d
+config_file="$config_dir/99-inir-battery-charge-limit.conf"
+
+# General TLP settings use a separate iNiR-owned drop-in. Keeping battery-care
+# ownership separate means disabling a charge limit can never discard unrelated
+# power settings staged from the Quickshell settings page.
+tlp_settings_config_file="$config_dir/99-inir-tlp-settings.conf"
+tlp_settings_schema=/usr/share/inir/tlp-settings-schema.json
+tlp_settings_lock=/run/lock/inir-tlp-settings.lock
+
+# TLP 1.10 writes PLATFORM_PROFILE_* to this kernel ABI and TLP 1.11 reads
+# platform_profile_choices before selecting from an ordered fallback list. Keep
+# the same ABI as the runtime authority instead of maintaining a vendor list.
+# Regression tests source this helper and may replace the path with a fixture.
+platform_profile_choices_file=/sys/firmware/acpi/platform_profile_choices
+
+tlp_bin=""
+tlp_lib_dir=""
+
+managed=0
+managed_battery=""
+managed_start=""
+managed_stop=""
+
+available=0
+supported=0
+state_known=0
+active=0
+reason=""
+
+probe_version=""
+probe_enabled=""
+probe_plugin=""
+probe_method=""
+probe_variant=""
+probe_battery=""
+probe_config_battery=""
+probe_current_start=""
+probe_current_stop=""
+probe_start_values=""
+probe_stop_values=""
+
+start_kind="none"
+start_min=""
+start_max=""
+start_step=1
+start_values=""
+start_required=0
+minimum_gap=0
+
+stop_kind="none"
+stop_min=""
+stop_max=""
+stop_step=1
+stop_values=""
+fixed_limit=""
+
+tmp_file=""
+backup_file=""
+had_config=0
+
+tlp_settings_tmp_file=""
+tlp_settings_backup_file=""
+tlp_settings_had_config=0
+
+usage() {
+    printf '%s\n' 'Usage: inir-battery-charge-limit --status | --set <value> | --disable' >&2
+    printf '%s\n' '       inir-battery-charge-limit --config-status | --config-apply <operations...> | --config-reset' >&2
+    printf '%s\n' '       config operations: --set <key> <value> | --unset <key> | --charge-set <value> | --charge-disable' >&2
+    return 2
+}
+
+cleanup() {
+    [ -z "$tmp_file" ] || rm -f -- "$tmp_file"
+    [ -z "$backup_file" ] || rm -f -- "$backup_file"
+    [ -z "$tlp_settings_tmp_file" ] || rm -f -- "$tlp_settings_tmp_file"
+    [ -z "$tlp_settings_backup_file" ] || rm -f -- "$tlp_settings_backup_file"
+}
+
+is_uint() {
+    case "${1:-}" in
+        ''|*[!0-9]*) return 1 ;;
+        *) return 0 ;;
+    esac
+}
+
+bool_json() {
+    if [ "${1:-0}" -eq 1 ]; then
+        printf true
+    else
+        printf false
+    fi
+}
+
+number_json() {
+    if is_uint "${1:-}"; then
+        printf '%s' "$1"
+    else
+        printf null
+    fi
+}
+
+token_json() {
+    # Values passed here are TLP version/plugin identifiers or our own reason
+    # codes. Restrict them to a JSON-safe identifier alphabet.
+    printf '"%s"' "$(printf '%s' "${1:-}" | tr -cd 'A-Za-z0-9._+:/-')"
+}
+
+number_array_json() {
+    local separator=""
+    local value
+
+    printf '['
+    for value in ${1:-}; do
+        is_uint "$value" || continue
+        printf '%s%s' "$separator" "$value"
+        separator=,
+    done
+    printf ']'
+}
+
+normalize_number_list() {
+    local output=""
+    local value
+
+    for value in ${1:-}; do
+        is_uint "$value" || continue
+        output="${output}${output:+ }${value}"
+    done
+    printf '%s' "$output"
+}
+
+read_managed_policy() {
+    local line key value
+
+    managed=0
+    managed_battery=""
+    managed_start=""
+    managed_stop=""
+
+    [ -f "$config_file" ] || return 0
+    managed=1
+
+    while IFS= read -r line || [ -n "$line" ]; do
+        key=${line%%=*}
+        value=${line#*=}
+        case "$key" in
+            START_CHARGE_THRESH_BAT0|START_CHARGE_THRESH_BAT1)
+                is_uint "$value" || continue
+                managed_battery=${key#START_CHARGE_THRESH_}
+                managed_start=$value
+                ;;
+            STOP_CHARGE_THRESH_BAT0|STOP_CHARGE_THRESH_BAT1)
+                is_uint "$value" || continue
+                managed_battery=${key#STOP_CHARGE_THRESH_}
+                managed_stop=$value
+                ;;
+        esac
+    done < "$config_file"
+}
+
+find_tlp_runtime() {
+    local candidate library_candidates
+
+    tlp_bin=""
+    tlp_lib_dir=""
+
+    for candidate in /usr/sbin/tlp /usr/bin/tlp /usr/local/sbin/tlp /usr/local/bin/tlp; do
+        if [ -x "$candidate" ]; then
+            tlp_bin=$candidate
+            break
+        fi
+    done
+    [ -n "$tlp_bin" ] || return 1
+
+    case "$tlp_bin" in
+        /usr/local/*) library_candidates="/usr/local/share/tlp /usr/local/lib/tlp /usr/share/tlp /usr/lib/tlp" ;;
+        *) library_candidates="/usr/share/tlp /usr/lib/tlp /usr/local/share/tlp /usr/local/lib/tlp" ;;
+    esac
+
+    for candidate in $library_candidates; do
+        if [ -r "$candidate/tlp-func-base" ] \
+            && [ -r "$candidate/func.d/35-tlp-func-batt" ]; then
+            tlp_lib_dir=$candidate
+            break
+        fi
+    done
+
+    return 0
+}
+
+read_probe_thresholds() {
+    current_start=""
+    current_stop=""
+
+    case "${_batdrv_plugin:-}" in
+        huawei)
+            thresholds=$(batdrv_read_threshold stop 0 2>/dev/null)
+            # Huawei returns "start stop" from one combined sysfs attribute.
+            set -- $thresholds
+            [ "$#" -ge 2 ] && current_start=$1 && current_stop=$2
+            ;;
+        # Toshiba and ASUS predate the two-argument plugin read signature.
+        # Passing "stop" to either one selects its human-readable error path.
+        toshiba|asus)
+            current_stop=$(batdrv_read_threshold 0 2>/dev/null)
+            ;;
+        lenovo|lenovo-legacy|samsung|lg|sony)
+            current_stop=$(batdrv_read_threshold stop 0 2>/dev/null)
+            # Sony exposes 0 in sysfs for TLP's conventional disabled value 100.
+            [ "${_batdrv_plugin:-}" != sony ] || [ "$current_stop" != 0 ] || current_stop=100
+            ;;
+        cros-ec)
+            if [ "${_natacpi:-}" = 0 ]; then
+                current_start=$(batdrv_read_threshold start 0 2>/dev/null)
+            fi
+            current_stop=$(batdrv_read_threshold stop 0 2>/dev/null)
+            ;;
+        *)
+            current_start=$(batdrv_read_threshold start 0 2>/dev/null)
+            current_stop=$(batdrv_read_threshold stop 0 2>/dev/null)
+            ;;
+    esac
+}
+
+run_probe() (
+    # TLP's libraries are private shell APIs and are not written for errexit or
+    # nounset. Keep them contained in this read-only subshell.
+    set +e
+    set +u
+
+    PATH=/usr/sbin:/usr/bin:/sbin:/bin
+    export PATH
+
+    # TLP's upstream test suite uses X_* environment hooks to simulate vendor
+    # plugins and threshold values. Never let an inherited test hook influence
+    # the status used for a real policy decision.
+    for test_hook in $(env | sed -n 's/^\(X_[A-Za-z0-9_]*\)=.*/\1/p'); do
+        unset "$test_hook"
+    done
+
+    # Plugin selection may otherwise load tp_smapi or tuxedo_keyboard. Status
+    # detection must never change the running kernel; report success only for a
+    # module which is already present.
+    modprobe() {
+        local module
+        module=$(printf '%s' "${1##*/}" | tr '-' '_')
+        [ -n "$module" ] && [ -d "/sys/module/$module" ]
+    }
+
+    # shellcheck disable=SC1090
+    . "$tlp_lib_dir/tlp-func-base" || exit 70
+    # shellcheck disable=SC1090
+    . "$tlp_lib_dir/func.d/35-tlp-func-batt" || exit 70
+
+    _nodebug=1
+    _conf_tmp=""
+    probe_cleanup() {
+        [ -z "${_conf_tmp:-}" ] || rm -f -- "$_conf_tmp"
+    }
+    trap probe_cleanup EXIT
+    trap 'probe_cleanup; exit 1' HUP INT TERM
+
+    # Respect the user's effective TLP configuration while suppressing config
+    # tracing. A broken config must not fall through to partially initialized
+    # defaults, and a deliberately disabled TLP must not probe or advertise
+    # battery-care support.
+    # read_config deliberately returns success even when tlp-readconfs fails;
+    # TLP_ENABLE is one of TLP's mandatory intrinsic defaults, so its absence
+    # is the reliable fail-closed signal for an unusable merged config.
+    unset TLP_ENABLE
+    read_config 1 >/dev/null 2>&1
+    case "${TLP_ENABLE:-}" in
+        0|1) ;;
+        *) exit 73 ;;
+    esac
+    TLP_LOAD_MODULES=n
+
+    printf 'version=%s\n' "${TLPVER:-}"
+    printf 'enabled=%s\n' "${TLP_ENABLE:-}"
+    [ "${TLP_ENABLE:-}" = 1 ] || exit 0
+
+    select_batdrv >/dev/null 2>&1 || exit 71
+
+    printf 'plugin=%s\n' "${_batdrv_plugin:-}"
+    printf 'method=%s\n' "${_bm_thresh:-none}"
+    printf 'variant=%s\n' "${_natacpi:-}"
+
+    [ "${_bm_thresh:-none}" != none ] || exit 0
+    batdrv_select_battery DEF >/dev/null 2>&1 || exit 72
+
+    printf 'battery=%s\n' "${_bat_str:-}"
+    printf 'config_battery=%s\n' "${_bt_cfg_bat:-}"
+
+    read_probe_thresholds
+
+    printf 'current_start=%s\n' "$current_start"
+    printf 'current_stop=%s\n' "$current_stop"
+    printf 'start_values=%s\n' "${_bt_set_start:-}"
+    printf 'stop_values=%s\n' "${_bt_set_stop:-}"
+)
+
+reset_probe() {
+    supported=0
+    state_known=0
+    active=0
+    reason=""
+
+    probe_version=""
+    probe_enabled=""
+    probe_plugin=""
+    probe_method=""
+    probe_variant=""
+    probe_battery=""
+    probe_config_battery=""
+    probe_current_start=""
+    probe_current_stop=""
+    probe_start_values=""
+    probe_stop_values=""
+
+    start_kind=none
+    start_min=""
+    start_max=""
+    start_step=1
+    start_values=""
+    start_required=0
+    minimum_gap=0
+
+    stop_kind=none
+    stop_min=""
+    stop_max=""
+    stop_step=1
+    stop_values=""
+    fixed_limit=""
+}
+
+tlp_version_value_supported() {
+    local major rest minor
+
+    major=${1%%.*}
+    rest=${1#*.}
+    minor=${rest%%.*}
+    is_uint "$major" && is_uint "$minor" || return 1
+
+    # This adapter is pinned to the private plugin API audited in TLP 1.10.2.
+    # The relevant interface and constraints are unchanged in TLP 1.11 alpha.
+    [ "$major" -eq 1 ] && [ "$minor" -ge 10 ] && [ "$minor" -le 11 ]
+}
+
+tlp_version_supported() {
+    tlp_version_value_supported "$probe_version"
+}
+
+set_capabilities() {
+    start_kind=none
+    start_min=""
+    start_max=""
+    start_step=1
+    start_values=""
+    start_required=0
+    minimum_gap=0
+
+    stop_kind=none
+    stop_min=""
+    stop_max=""
+    stop_step=1
+    stop_values=""
+    fixed_limit=""
+
+    case "$probe_plugin" in
+        thinkpad)
+            start_kind=continuous; start_min=0; start_max=99; start_required=1; minimum_gap=1
+            stop_kind=continuous; stop_min=1; stop_max=100
+            ;;
+        thinkpad-legacy)
+            start_kind=continuous; start_min=2; start_max=96; start_required=1; minimum_gap=4
+            stop_kind=continuous; stop_min=6; stop_max=100
+            ;;
+        huawei)
+            start_kind=continuous; start_min=0; start_max=99; start_required=1; minimum_gap=0
+            stop_kind=continuous; stop_min=1; stop_max=100
+            ;;
+        msi)
+            start_kind=derived
+            stop_kind=continuous; stop_min=10; stop_max=100
+            ;;
+        lenovo|lenovo-legacy|samsung)
+            stop_kind=mode; stop_values="0 1"; fixed_limit=1
+            ;;
+        lg|macbook|toshiba)
+            start_kind=derived
+            stop_kind=fixed; stop_values="80 100"; fixed_limit=80
+            ;;
+        sony)
+            stop_kind=discrete; stop_values="50 80 100"
+            ;;
+        system76)
+            start_kind=continuous; start_min=0; start_max=99; start_required=1; minimum_gap=1
+            stop_kind=continuous; stop_min=1; stop_max=100
+            ;;
+        cros-ec)
+            if [ "$probe_variant" = 0 ]; then
+                start_kind=continuous; start_min=0; start_max=99; start_required=1; minimum_gap=1
+            fi
+            stop_kind=continuous; stop_min=1; stop_max=100
+            ;;
+        dell|wilco-ec)
+            start_kind=continuous; start_min=50; start_max=95; start_required=1; minimum_gap=5
+            stop_kind=continuous; stop_min=55; stop_max=100
+            ;;
+        tuxedo)
+            start_kind=discrete
+            start_values=$(normalize_number_list "$probe_start_values")
+            stop_kind=discrete
+            stop_values=$(normalize_number_list "$probe_stop_values")
+            start_required=1
+            minimum_gap=1
+            [ -n "$start_values" ] && [ -n "$stop_values" ] || return 1
+            ;;
+        asus)
+            stop_kind=continuous; stop_min=1; stop_max=100
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+
+    return 0
+}
+
+load_probe() {
+    local output line key value cli_version probe_rc=0
+
+    reset_probe
+    output=$(run_probe 2>/dev/null) || probe_rc=$?
+    if [ "$probe_rc" -ne 0 ]; then
+        case "$probe_rc" in
+            70) reason=tlp-internals-unavailable ;;
+            72) reason=battery-unavailable ;;
+            73) reason=tlp-config-unavailable ;;
+            *) reason=probe-failed ;;
+        esac
+        return 1
+    fi
+
+    while IFS= read -r line || [ -n "$line" ]; do
+        key=${line%%=*}
+        value=${line#*=}
+        case "$key" in
+            version) probe_version=$value ;;
+            enabled) probe_enabled=$value ;;
+            plugin) probe_plugin=$value ;;
+            method) probe_method=$value ;;
+            variant) probe_variant=$value ;;
+            battery) probe_battery=$value ;;
+            config_battery) probe_config_battery=$value ;;
+            current_start) probe_current_start=$value ;;
+            current_stop) probe_current_stop=$value ;;
+            start_values) probe_start_values=$value ;;
+            stop_values) probe_stop_values=$value ;;
+        esac
+    done <<EOF
+$output
+EOF
+
+    cli_version=$("$tlp_bin" --version 2>/dev/null | awk '/^TLP version / { print $3; exit }')
+    if [ -n "$cli_version" ] && [ "$cli_version" != "$probe_version" ]; then
+        reason=tlp-runtime-mismatch
+        return 1
+    fi
+
+    if ! tlp_version_supported; then
+        reason=unsupported-tlp-version
+        return 1
+    fi
+    if [ "$probe_enabled" != 1 ]; then
+        reason=tlp-disabled
+        return 1
+    fi
+    if [ -z "$probe_plugin" ]; then
+        reason=probe-failed
+        return 1
+    fi
+    if [ "$probe_method" = none ] || [ "$probe_plugin" = generic ]; then
+        reason=charge-control-unsupported
+        return 1
+    fi
+    case "$probe_config_battery" in
+        BAT0|BAT1) ;;
+        *) reason=battery-unavailable; return 1 ;;
+    esac
+    if ! set_capabilities; then
+        reason=unsupported-tlp-plugin
+        return 1
+    fi
+
+    supported=1
+    if is_uint "$probe_current_stop"; then
+        state_known=1
+        case "$stop_kind" in
+            mode) [ "$probe_current_stop" -eq 1 ] && active=1 || active=0 ;;
+            *)
+                if [ "$probe_current_stop" -gt 0 ] && [ "$probe_current_stop" -lt 100 ]; then
+                    active=1
+                else
+                    active=0
+                fi
+                ;;
+        esac
+    fi
+
+    return 0
+}
+
+emit_status_json() {
+    local adjustable=0
+    case "$stop_kind" in continuous|discrete) adjustable=1 ;; esac
+
+    printf '{'
+    printf '"schema":1,'
+    printf '"available":%s,' "$(bool_json "$available")"
+    printf '"supported":%s,' "$(bool_json "$supported")"
+    printf '"adjustable":%s,' "$(bool_json "$adjustable")"
+    printf '"stateKnown":%s,' "$(bool_json "$state_known")"
+    printf '"active":%s,' "$(bool_json "$active")"
+    printf '"managed":%s,' "$(bool_json "$managed")"
+    printf '"tlpVersion":%s,' "$(token_json "$probe_version")"
+    printf '"plugin":%s,' "$(token_json "$probe_plugin")"
+    printf '"method":%s,' "$(token_json "$probe_method")"
+    printf '"battery":%s,' "$(token_json "$probe_battery")"
+    printf '"configBattery":%s,' "$(token_json "$probe_config_battery")"
+    printf '"currentStart":%s,' "$(number_json "$probe_current_start")"
+    printf '"currentLimit":%s,' "$(number_json "$probe_current_stop")"
+    printf '"limitKind":%s,' "$(token_json "$stop_kind")"
+    printf '"minimumLimit":%s,' "$(number_json "$stop_min")"
+    printf '"maximumLimit":%s,' "$(number_json "$stop_max")"
+    printf '"stepSize":%s,' "$stop_step"
+    printf '"allowedLimits":%s,' "$(number_array_json "$stop_values")"
+    printf '"fixedLimit":%s,' "$(number_json "$fixed_limit")"
+    printf '"managedBattery":%s,' "$(token_json "$managed_battery")"
+    printf '"managedStart":%s,' "$(number_json "$managed_start")"
+    printf '"managedLimit":%s,' "$(number_json "$managed_stop")"
+    printf '"reason":%s' "$(token_json "$reason")"
+    printf '}\n'
+}
+
+status() {
+    read_managed_policy
+    available=0
+    reset_probe
+
+    if ! find_tlp_runtime; then
+        reason=tlp-unavailable
+        emit_status_json
+        return 0
+    fi
+    available=1
+
+    if [ -z "$tlp_lib_dir" ]; then
+        reason=tlp-internals-unavailable
+        emit_status_json
+        return 0
+    fi
+
+    load_probe || true
+    emit_status_json
+}
+
+value_in_list() {
+    local wanted=$1
+    local candidate
+    for candidate in ${2:-}; do
+        [ "$candidate" = "$wanted" ] && return 0
+    done
+    return 1
+}
+
+normalize_requested_stop() {
+    local requested=$1
+
+    case "$stop_kind" in
+        mode|fixed)
+            printf '%s' "$fixed_limit"
+            ;;
+        continuous)
+            if [ "$requested" -lt "$stop_min" ] || [ "$requested" -gt "$stop_max" ]; then
+                printf 'Charge limit must be between %s and %s for TLP plugin %s.\n' \
+                    "$stop_min" "$stop_max" "$probe_plugin" >&2
+                return 2
+            fi
+            printf '%s' "$requested"
+            ;;
+        discrete)
+            if ! value_in_list "$requested" "$stop_values"; then
+                printf 'Charge limit %s%% is not supported by TLP plugin %s (allowed: %s).\n' \
+                    "$requested" "$probe_plugin" "$stop_values" >&2
+                return 2
+            fi
+            printf '%s' "$requested"
+            ;;
+        *)
+            printf '%s\n' 'TLP did not expose a usable charge-limit capability.' >&2
+            return 1
+            ;;
+    esac
+}
+
+start_fits_stop() {
+    local start=$1
+    local stop=$2
+
+    is_uint "$start" || return 1
+    case "$start_kind" in
+        continuous)
+            [ "$start" -ge "$start_min" ] && [ "$start" -le "$start_max" ] || return 1
+            ;;
+        discrete)
+            value_in_list "$start" "$start_values" || return 1
+            ;;
+        *) return 1 ;;
+    esac
+
+    [ $((start + minimum_gap)) -le "$stop" ]
+}
+
+choose_start() {
+    local stop=$1
+    local candidate
+
+    [ "$start_required" -eq 1 ] || return 0
+
+    if start_fits_stop "$probe_current_start" "$stop"; then
+        printf '%s' "$probe_current_start"
+        return 0
+    fi
+
+    case "$start_kind" in
+        continuous)
+            candidate=$start_min
+            if start_fits_stop "$candidate" "$stop"; then
+                printf '%s' "$candidate"
+                return 0
+            fi
+            ;;
+        discrete)
+            for candidate in $start_values; do
+                if start_fits_stop "$candidate" "$stop"; then
+                    printf '%s' "$candidate"
+                    return 0
+                fi
+            done
+            ;;
+    esac
+
+    printf 'No valid start threshold is available for stop threshold %s with TLP plugin %s.\n' \
+        "$stop" "$probe_plugin" >&2
+    return 2
+}
+
+run_tlp_start() {
+    "$tlp_bin" start
+}
+
+run_tlp_fullcharge() {
+    "$tlp_bin" fullcharge
+}
+
+tlp_output_has_policy_error() {
+    printf '%s\n' "${1:-}" | grep -Eiq \
+        'Error in configuration|Battery skipped|Error:.*(charge|threshold|battery care)'
+}
+
+backup_policy_file() {
+    had_config=0
+    backup_file=""
+    if [ -f "$config_file" ]; then
+        backup_file=$(mktemp "$config_file.prev.XXXXXX") || return 1
+        cp -p -- "$config_file" "$backup_file" || return 1
+        had_config=1
+    fi
+}
+
+stage_policy() {
+    local target_start=$1
+    local target_stop=$2
+    local target_battery=$3
+    local target_plugin=$4
+
+    mkdir -p "$config_dir" || return 1
+    backup_policy_file || return 1
+
+    tmp_file=$(mktemp "$config_file.tmp.XXXXXX") || return 1
+    {
+        printf '%s\n' '# Managed by iNiR. Do not edit manually.'
+        printf '# Battery/backend detected by TLP: %s (%s)\n' "$target_battery" "$target_plugin"
+        if [ -n "$target_start" ]; then
+            printf 'START_CHARGE_THRESH_%s=%s\n' "$target_battery" "$target_start"
+        fi
+        printf 'STOP_CHARGE_THRESH_%s=%s\n' "$target_battery" "$target_stop"
+    } > "$tmp_file" || return 1
+    chmod 0644 "$tmp_file" || return 1
+    mv -f -- "$tmp_file" "$config_file" || return 1
+    tmp_file=""
+}
+
+stage_policy_removal() {
+    backup_policy_file || return 1
+    rm -f -- "$config_file"
+}
+
+restore_policy_file() {
+    if [ "$had_config" -eq 1 ] && [ -n "$backup_file" ] && [ -f "$backup_file" ]; then
+        mv -f -- "$backup_file" "$config_file"
+        backup_file=""
+    else
+        rm -f -- "$config_file"
+    fi
+}
+
+rollback_policy() {
+    local rollback_output="" rollback_rc=0
+
+    restore_policy_file || rollback_rc=1
+
+    rollback_output=$(run_tlp_start 2>&1) || rollback_rc=1
+    if [ "$rollback_rc" -eq 0 ] && tlp_output_has_policy_error "$rollback_output"; then
+        rollback_rc=1
+    fi
+    return "$rollback_rc"
+}
+
+set_policy() {
+    local requested=$1
+    local expected_plugin expected_battery target_start target_stop
+    local apply_output apply_rc=0 rollback_rc=0
+
+    is_uint "$requested" || {
+        printf '%s\n' 'Invalid charge limit value.' >&2
+        return 2
+    }
+    [ "$requested" -ge 1 ] && [ "$requested" -le 100 ] || {
+        printf '%s\n' 'Charge limit must be between 1 and 100.' >&2
+        return 2
+    }
+
+    if ! load_probe || [ "$supported" -ne 1 ]; then
+        printf 'TLP battery charge control is unavailable (%s).\n' "${reason:-probe-failed}" >&2
+        return 1
+    fi
+
+    target_stop=$(normalize_requested_stop "$requested") || return $?
+    target_start=$(choose_start "$target_stop") || return $?
+    expected_plugin=$probe_plugin
+    expected_battery=$probe_config_battery
+
+    stage_policy "$target_start" "$target_stop" "$expected_battery" "$expected_plugin" || {
+        printf '%s\n' 'Could not write the iNiR TLP policy.' >&2
+        return 1
+    }
+
+    apply_output=$(run_tlp_start 2>&1) || apply_rc=$?
+    [ -z "$apply_output" ] || printf '%s\n' "$apply_output" >&2
+
+    if [ "$apply_rc" -ne 0 ] || tlp_output_has_policy_error "$apply_output"; then
+        rollback_policy || rollback_rc=$?
+        printf '%s\n' 'TLP rejected the requested battery charge policy; previous configuration restored.' >&2
+        [ "$rollback_rc" -eq 0 ] || printf '%s\n' 'Warning: re-applying the previous TLP policy also failed.' >&2
+        return 1
+    fi
+
+    # TLP threshold validation failures frequently do not affect `tlp start`'s
+    # exit code. The authoritative post-write read is therefore mandatory.
+    if ! load_probe \
+        || [ "$supported" -ne 1 ] \
+        || [ "$state_known" -ne 1 ] \
+        || [ "$probe_plugin" != "$expected_plugin" ] \
+        || [ "$probe_config_battery" != "$expected_battery" ] \
+        || [ "$probe_current_stop" != "$target_stop" ] \
+        || { [ -n "$target_start" ] && [ "$probe_current_start" != "$target_start" ]; }; then
+        rollback_policy || rollback_rc=$?
+        printf '%s\n' 'TLP did not apply the requested battery charge policy; previous configuration restored.' >&2
+        [ "$rollback_rc" -eq 0 ] || printf '%s\n' 'Warning: re-applying the previous TLP policy also failed.' >&2
+        return 1
+    fi
+
+    [ -z "$backup_file" ] || rm -f -- "$backup_file"
+    backup_file=""
+    return 0
+}
+
+disable_policy() {
+    local fullcharge_output="" fullcharge_rc=0
+    local start_output="" start_rc=0
+
+    # Ownership removal is unconditional. If TLP disappeared, keeping a stale
+    # iNiR drop-in would be worse than reporting that hardware reset was skipped.
+    rm -f -- "$config_file" || return 1
+
+    if ! find_tlp_runtime; then
+        printf '%s\n' 'iNiR policy removed, but TLP is unavailable; hardware defaults could not be restored.' >&2
+        return 1
+    fi
+
+    fullcharge_output=$(run_tlp_fullcharge 2>&1) || fullcharge_rc=$?
+    if [ "$fullcharge_rc" -ne 0 ]; then
+        printf '%s\n' 'Warning: TLP could not restore vendor full-charge thresholds; continuing with remaining TLP configuration.' >&2
+        [ -z "$fullcharge_output" ] || printf '%s\n' "$fullcharge_output" >&2
+    fi
+
+    start_output=$(run_tlp_start 2>&1) || start_rc=$?
+    [ -z "$start_output" ] || printf '%s\n' "$start_output" >&2
+    if [ "$start_rc" -ne 0 ] || tlp_output_has_policy_error "$start_output"; then
+        printf '%s\n' 'iNiR policy removed, but re-applying the remaining TLP configuration failed.' >&2
+        return 1
+    fi
+
+    return 0
+}
+
+tlp_settings_schema_ready() {
+    command -v jq >/dev/null 2>&1 &&
+        [ -r "$tlp_settings_schema" ] &&
+        jq -e '.schema == 1 and ([.categories[].settings[].key] | length > 0)' "$tlp_settings_schema" >/dev/null 2>&1
+}
+
+tlp_settings_definition() {
+    local key=${1:-}
+
+    case "$key" in
+        ''|*[!A-Z0-9_]*) return 1 ;;
+    esac
+    jq -ce --arg key "$key" '[.categories[].settings[] | select(.key == $key)][0] // empty' "$tlp_settings_schema"
+}
+
+tlp_settings_version_minor() {
+    local version=${1:-}
+    local major rest minor
+
+    major=${version%%.*}
+    rest=${version#*.}
+    minor=${rest%%.*}
+    is_uint "$major" && is_uint "$minor" || return 1
+    [ "$major" -eq 1 ] || return 1
+    printf '%s' "$minor"
+}
+
+tlp_setting_available_for_version() {
+    local definition=$1 version=$2
+    local required version_minor required_minor
+
+    required=$(printf '%s' "$definition" | jq -r '.minVersion // empty')
+    [ -n "$required" ] || return 0
+    version_minor=$(tlp_settings_version_minor "$version") || return 1
+    required_minor=$(tlp_settings_version_minor "$required") || return 1
+    [ "$version_minor" -ge "$required_minor" ]
+}
+
+tlp_settings_value_is_safe() {
+    local value=${1:-}
+
+    [ "${#value}" -le 1024 ] || return 1
+    [ -n "$value" ] || return 0
+    printf '%s' "$value" | LC_ALL=C grep -Eq '^[A-Za-z0-9_+.,:/@*% -]*$'
+}
+
+# TLP's public settings documentation is authoritative where TLPUI's static
+# 1.10 schema is incomplete. Keep these exceptions deliberately small and
+# auditable rather than relaxing all schema validation.
+tlp_settings_extra_value_allowed() {
+    local key=$1 candidate=$2
+
+    case "$key" in
+        DISK_APM_LEVEL_ON_AC|DISK_APM_LEVEL_ON_BAT|\
+        DISK_SPINDOWN_TIMEOUT_ON_AC|DISK_SPINDOWN_TIMEOUT_ON_BAT|\
+        DISK_IOSCHED)
+            case "$candidate" in keep|_) return 0 ;; esac
+            ;;
+        CPU_SCALING_GOVERNOR_ON_AC|CPU_SCALING_GOVERNOR_ON_BAT|CPU_SCALING_GOVERNOR_ON_SAV)
+            [ "$candidate" = userspace ] && return 0
+            ;;
+    esac
+    return 1
+}
+
+tlp_platform_profile_choices() {
+    local raw candidate output=""
+
+    [ -r "$platform_profile_choices_file" ] || return 1
+    raw=$(tr '\t\r\n' '   ' < "$platform_profile_choices_file") || return 1
+    for candidate in $raw; do
+        # Kernel platform-profile ABI names are identifiers, not arbitrary
+        # config strings. Apply the same conservative alphabet as TLP values.
+        printf '%s' "$candidate" | LC_ALL=C grep -Eq '^[A-Za-z0-9_+.-]+$' || continue
+        value_in_list "$candidate" "$output" && continue
+        output="${output}${output:+ }${candidate}"
+    done
+    [ -n "$output" ] || return 1
+    printf '%s' "$output"
+}
+
+tlp_settings_runtime_values_json() {
+    local choices=""
+
+    choices=$(tlp_platform_profile_choices 2>/dev/null || true)
+    jq -n --arg choices "$choices" '
+        ($choices | split(" ") | map(select(length > 0))) as $values
+        | {
+            PLATFORM_PROFILE_ON_AC: $values,
+            PLATFORM_PROFILE_ON_BAT: $values,
+            PLATFORM_PROFILE_ON_SAV: $values
+        }
+    '
+}
+
+tlp_settings_validate_platform_profile() {
+    local key=$1 value=$2 version=$3 runtime_required=${4:-0}
+    local current_minor choices candidate match=0 count=0
+
+    [ -n "$value" ] || {
+        printf 'TLP setting %s requires at least one platform profile.\n' "$key" >&2
+        return 2
+    }
+    current_minor=$(tlp_settings_version_minor "$version") || {
+        printf 'Cannot determine TLP version for platform profile %s.\n' "$key" >&2
+        return 2
+    }
+
+    for candidate in $value; do
+        count=$((count + 1))
+    done
+    if [ "$current_minor" -lt 11 ] && [ "$count" -ne 1 ]; then
+        printf 'TLP %s requires exactly one value for %s.\n' "$version" "$key" >&2
+        return 2
+    fi
+
+    # Reading an existing iNiR drop-in must remain possible after a firmware or
+    # hardware capability change. Runtime matching is therefore mandatory only
+    # for a newly staged value, while stored values still undergo all safety and
+    # version/shape checks above.
+    [ "$runtime_required" -eq 1 ] || return 0
+
+    choices=$(tlp_platform_profile_choices 2>/dev/null || true)
+    [ -n "$choices" ] || {
+        printf 'Platform profile choices are unavailable for TLP setting %s. Check tlp-stat -p.\n' "$key" >&2
+        return 2
+    }
+
+    if [ "$current_minor" -lt 11 ]; then
+        value_in_list "$value" "$choices" || {
+            printf 'Platform profile %s is not available for TLP setting %s (available: %s).\n' "$value" "$key" "$choices" >&2
+            return 2
+        }
+        return 0
+    fi
+
+    # TLP 1.11 intentionally accepts ordered fallback lists. Some entries may
+    # target another laptop/firmware, so requiring every token to be locally
+    # available would break that feature. Require at least one local match to
+    # avoid accepting a list which TLP would silently no-op on this machine.
+    for candidate in $value; do
+        if value_in_list "$candidate" "$choices"; then
+            match=1
+            break
+        fi
+    done
+    [ "$match" -eq 1 ] || {
+        printf 'No platform profile in "%s" is available for %s (available: %s).\n' "$value" "$key" "$choices" >&2
+        return 2
+    }
+    return 0
+}
+
+tlp_settings_validate_value() {
+    local key=$1 value=$2 version=${3:-} runtime_required=${4:-0}
+    local definition type minimum maximum candidate
+    local multiple_from current_minor multiple_minor
+
+    tlp_settings_value_is_safe "$value" || {
+        printf 'Unsafe value for TLP setting %s.\n' "$key" >&2
+        return 2
+    }
+
+    definition=$(tlp_settings_definition "$key") || {
+        printf 'Unknown TLP setting: %s.\n' "$key" >&2
+        return 2
+    }
+    if [ -n "$version" ] && ! tlp_setting_available_for_version "$definition" "$version"; then
+        printf 'TLP setting %s requires a newer supported TLP version.\n' "$key" >&2
+        return 2
+    fi
+
+    case "$key" in
+        PLATFORM_PROFILE_ON_AC|PLATFORM_PROFILE_ON_BAT|PLATFORM_PROFILE_ON_SAV)
+            tlp_settings_validate_platform_profile "$key" "$value" "$version" "$runtime_required"
+            return $?
+            ;;
+    esac
+
+    type=$(printf '%s' "$definition" | jq -r '.type')
+    case "$type" in
+        number)
+            is_uint "$value" || {
+                printf 'TLP setting %s requires an unsigned integer.\n' "$key" >&2
+                return 2
+            }
+            minimum=$(printf '%s' "$definition" | jq -r '.min')
+            maximum=$(printf '%s' "$definition" | jq -r '.max')
+            [ "$value" -ge "$minimum" ] && [ "$value" -le "$maximum" ] || {
+                printf 'TLP setting %s must be between %s and %s.\n' "$key" "$minimum" "$maximum" >&2
+                return 2
+            }
+            ;;
+        select)
+            multiple_from=$(printf '%s' "$definition" | jq -r '.multipleFromVersion // empty')
+            current_minor=$(tlp_settings_version_minor "$version" 2>/dev/null || true)
+            multiple_minor=$(tlp_settings_version_minor "$multiple_from" 2>/dev/null || true)
+            if [ -n "$current_minor" ] && [ -n "$multiple_minor" ] && [ "$current_minor" -ge "$multiple_minor" ]; then
+                [ -n "$value" ] || {
+                    printf 'TLP setting %s requires at least one value.\n' "$key" >&2
+                    return 2
+                }
+                for candidate in $value; do
+                    if ! printf '%s' "$definition" | jq -e --arg value "$candidate" '.values | index($value) != null' >/dev/null \
+                        && ! tlp_settings_extra_value_allowed "$key" "$candidate"; then
+                        printf 'Unsupported list item %s for TLP setting %s.\n' "$candidate" "$key" >&2
+                        return 2
+                    fi
+                done
+            else
+                if ! printf '%s' "$definition" | jq -e --arg value "$value" '.values | index($value) != null' >/dev/null \
+                    && ! tlp_settings_extra_value_allowed "$key" "$value"; then
+                    printf 'Unsupported value for TLP setting %s.\n' "$key" >&2
+                    return 2
+                fi
+            fi
+            ;;
+        list)
+            for candidate in $value; do
+                if ! printf '%s' "$definition" | jq -e --arg value "$candidate" '.values | index($value) != null' >/dev/null \
+                    && ! tlp_settings_extra_value_allowed "$key" "$candidate"; then
+                    printf 'Unsupported list item %s for TLP setting %s.\n' "$candidate" "$key" >&2
+                    return 2
+                fi
+            done
+            ;;
+        text)
+            minimum=$(printf '%s' "$definition" | jq -r '.itemMin // empty')
+            maximum=$(printf '%s' "$definition" | jq -r '.itemMax // empty')
+            if printf '%s' "$definition" | jq -e 'has("itemValues")' >/dev/null; then
+                for candidate in $value; do
+                    if ! printf '%s' "$definition" | jq -e --arg value "$candidate" '.itemValues | index($value) != null' >/dev/null \
+                        && ! tlp_settings_extra_value_allowed "$key" "$candidate"; then
+                        printf 'Unsupported list item %s for TLP setting %s.\n' "$candidate" "$key" >&2
+                        return 2
+                    fi
+                done
+            elif [ -n "$minimum" ] && [ -n "$maximum" ] && [ "$maximum" -gt 0 ]; then
+                for candidate in $value; do
+                    if tlp_settings_extra_value_allowed "$key" "$candidate"; then
+                        continue
+                    fi
+                    is_uint "$candidate" &&
+                        [ "$candidate" -ge "$minimum" ] &&
+                        [ "$candidate" -le "$maximum" ] || {
+                        printf 'TLP setting %s requires values between %s and %s, or TLP keep (_).\n' "$key" "$minimum" "$maximum" >&2
+                        return 2
+                    }
+                done
+            fi
+            ;;
+        *)
+            printf 'Unsupported schema type for TLP setting %s.\n' "$key" >&2
+            return 2
+            ;;
+    esac
+    return 0
+}
+
+tlp_settings_managed_records() {
+    local version=${1:-}
+    local line key value
+
+    [ -f "$tlp_settings_config_file" ] || return 0
+    while IFS= read -r line || [ -n "$line" ]; do
+        case "$line" in
+            ''|'#'*) continue ;;
+        esac
+
+        key=${line%%=*}
+        value=${line#*=}
+        [ "$key" != "$line" ] || {
+            printf '%s\n' 'The iNiR TLP settings drop-in contains an invalid line.' >&2
+            return 1
+        }
+        case "$value" in
+            \"*\") value=${value#\"}; value=${value%\"} ;;
+            # Early iNiR builds used shell-style single quotes, which TLP's
+            # config reader ignores. Accept them only so the next Apply can
+            # migrate the owned drop-in to TLP's double-quoted syntax.
+            \'*\') value=${value#\'}; value=${value%\'} ;;
+            *)
+                printf 'The iNiR TLP setting %s is not safely quoted.\n' "$key" >&2
+                return 1
+                ;;
+        esac
+        tlp_settings_validate_value "$key" "$value" "$version" || return $?
+        printf '%s\t%s\n' "$key" "$value"
+    done < "$tlp_settings_config_file"
+}
+
+run_tlp_settings_probe() (
+    local key is_set value
+
+    set +e
+    set +u
+    PATH=/usr/sbin:/usr/bin:/sbin:/bin
+    export PATH
+
+    # shellcheck disable=SC1090
+    . "$tlp_lib_dir/tlp-func-base" || exit 70
+
+    for key in $(jq -r '.categories[].settings[].key' "$tlp_settings_schema"); do
+        unset "$key"
+    done
+    unset TLP_ENABLE
+
+    _nodebug=1
+    _conf_tmp=""
+    probe_cleanup() {
+        [ -z "${_conf_tmp:-}" ] || rm -f -- "$_conf_tmp"
+    }
+    trap probe_cleanup EXIT
+    trap 'probe_cleanup; exit 1' HUP INT TERM
+
+    read_config 1 >/dev/null 2>&1
+    case "${TLP_ENABLE:-}" in
+        0|1) ;;
+        *) exit 73 ;;
+    esac
+
+    printf 'meta\tversion\t%s\n' "${TLPVER:-}"
+    printf 'meta\tenabled\t%s\n' "${TLP_ENABLE:-}"
+    for key in $(jq -r '.categories[].settings[].key' "$tlp_settings_schema"); do
+        eval "is_set=\${$key+x}"
+        [ "$is_set" = x ] || continue
+        eval "value=\${$key-}"
+        value=$(printf '%s' "$value" | tr '\t\r\n' '   ')
+        printf 'setting\t%s\t%s\n' "$key" "$value"
+    done
+)
+
+tlp_settings_records_json() {
+    jq -Rn '
+        reduce inputs as $line ({};
+            ($line | split("\t")) as $parts
+            | if ($parts | length) >= 2
+              then .[$parts[0]] = ($parts[1:] | join("\t"))
+              else .
+              end
+        )
+    '
+}
+
+emit_tlp_settings_empty_status() {
+    local status_available=${1:-0}
+    local status_supported=${2:-0}
+    local status_reason=${3:-tlp-unavailable}
+    local runtime_values_json
+
+    runtime_values_json=$(tlp_settings_runtime_values_json 2>/dev/null || printf '{}')
+    printf '{'
+    printf '"schema":1,'
+    printf '"available":%s,' "$(bool_json "$status_available")"
+    printf '"supported":%s,' "$(bool_json "$status_supported")"
+    printf '"configAvailable":false,'
+    printf '"enabled":false,'
+    printf '"tlpVersion":"",'
+    printf '"reason":%s,' "$(token_json "$status_reason")"
+    printf '"configFile":"%s",' "$tlp_settings_config_file"
+    printf '"effective":{},'
+    printf '"managed":{},'
+    printf '"runtimeValues":%s' "$runtime_values_json"
+    printf '}\n'
+}
+
+tlp_settings_status() {
+    local probe_output probe_rc=0 cli_version status_version status_enabled
+    local effective_records managed_records effective_json managed_json runtime_values_json
+
+    if ! command -v jq >/dev/null 2>&1 || [ ! -r "$tlp_settings_schema" ]; then
+        emit_tlp_settings_empty_status 0 0 schema-unavailable
+        return 0
+    fi
+    if ! tlp_settings_schema_ready; then
+        emit_tlp_settings_empty_status 0 0 schema-invalid
+        return 0
+    fi
+    if ! find_tlp_runtime; then
+        emit_tlp_settings_empty_status 0 0 tlp-unavailable
+        return 0
+    fi
+    if [ -z "$tlp_lib_dir" ]; then
+        emit_tlp_settings_empty_status 1 0 tlp-internals-unavailable
+        return 0
+    fi
+
+    probe_output=$(run_tlp_settings_probe 2>/dev/null) || probe_rc=$?
+    if [ "$probe_rc" -ne 0 ]; then
+        case "$probe_rc" in
+            70) emit_tlp_settings_empty_status 1 0 tlp-internals-unavailable ;;
+            73) emit_tlp_settings_empty_status 1 0 tlp-config-unavailable ;;
+            *) emit_tlp_settings_empty_status 1 0 probe-failed ;;
+        esac
+        return 0
+    fi
+
+    status_version=$(printf '%s\n' "$probe_output" | awk -F '\t' '$1 == "meta" && $2 == "version" { print $3; exit }')
+    status_enabled=$(printf '%s\n' "$probe_output" | awk -F '\t' '$1 == "meta" && $2 == "enabled" { print $3; exit }')
+    cli_version=$("$tlp_bin" --version 2>/dev/null | awk '/^TLP version / { print $3; exit }')
+    if [ -n "$cli_version" ] && [ "$cli_version" != "$status_version" ]; then
+        emit_tlp_settings_empty_status 1 0 tlp-runtime-mismatch
+        return 0
+    fi
+    if ! tlp_version_value_supported "$status_version"; then
+        emit_tlp_settings_empty_status 1 0 unsupported-tlp-version
+        return 0
+    fi
+
+    effective_records=$(printf '%s\n' "$probe_output" | awk -F '\t' '
+        $1 == "setting" {
+            printf "%s", $2
+            for (i = 3; i <= NF; i++) printf "%s%s", (i == 3 ? "\t" : FS), $i
+            printf "\n"
+        }
+    ')
+    if ! managed_records=$(tlp_settings_managed_records "$status_version"); then
+        emit_tlp_settings_empty_status 1 1 managed-config-invalid
+        return 0
+    fi
+
+    effective_json=$(printf '%s\n' "$effective_records" | sed '/^$/d' | tlp_settings_records_json)
+    managed_json=$(printf '%s\n' "$managed_records" | sed '/^$/d' | tlp_settings_records_json)
+    runtime_values_json=$(tlp_settings_runtime_values_json 2>/dev/null || printf '{}')
+
+    jq -n --arg version "$status_version" --arg reason "" --arg configFile "$tlp_settings_config_file" --argjson enabled "$([ "$status_enabled" = 1 ] && printf true || printf false)" --argjson effective "$effective_json" --argjson managed "$managed_json" --argjson runtimeValues "$runtime_values_json" '{
+            schema: 1,
+            available: true,
+            supported: true,
+            configAvailable: true,
+            enabled: $enabled,
+            tlpVersion: $version,
+            reason: $reason,
+            configFile: $configFile,
+            effective: $effective,
+            managed: $managed,
+            runtimeValues: $runtimeValues
+        }'
+}
+
+tlp_settings_update_record() {
+    local records=$1 mode=$2 key=$3 value=${4:-}
+    local next
+
+    next=$(mktemp "$records.next.XXXXXX") || return 1
+    awk -F '\t' -v key="$key" '$1 != key' "$records" > "$next" || {
+        rm -f -- "$next"
+        return 1
+    }
+    if [ "$mode" = set ]; then
+        printf '%s\t%s\n' "$key" "$value" >> "$next" || {
+            rm -f -- "$next"
+            return 1
+        }
+    fi
+    mv -f -- "$next" "$records"
+}
+
+tlp_settings_backup_owned_file() {
+    tlp_settings_had_config=0
+    tlp_settings_backup_file=""
+
+    if [ -f "$tlp_settings_config_file" ]; then
+        tlp_settings_backup_file=$(mktemp "$tlp_settings_config_file.prev.XXXXXX") || return 1
+        cp -p -- "$tlp_settings_config_file" "$tlp_settings_backup_file" || return 1
+        tlp_settings_had_config=1
+    fi
+}
+
+tlp_settings_write_records() {
+    local records=$1 key value tab
+
+    mkdir -p "$config_dir" || return 1
+    tlp_settings_backup_owned_file || return 1
+
+    if [ ! -s "$records" ]; then
+        rm -f -- "$tlp_settings_config_file"
+        return $?
+    fi
+
+    tlp_settings_tmp_file=$(mktemp "$tlp_settings_config_file.tmp.XXXXXX") || return 1
+    printf '%s\n' '# Managed by iNiR TLP Settings. Do not edit manually.' > "$tlp_settings_tmp_file" || return 1
+    tab=$(printf '\t')
+    sort "$records" | while IFS="$tab" read -r key value; do
+        [ -n "$key" ] || continue
+        printf '%s="%s"\n' "$key" "$value"
+    done >> "$tlp_settings_tmp_file" || return 1
+    chmod 0644 "$tlp_settings_tmp_file" || return 1
+    mv -f -- "$tlp_settings_tmp_file" "$tlp_settings_config_file" || return 1
+    tlp_settings_tmp_file=""
+}
+
+tlp_settings_restore_owned_file() {
+    if [ "$tlp_settings_had_config" -eq 1 ] &&
+        [ -n "$tlp_settings_backup_file" ] &&
+        [ -f "$tlp_settings_backup_file" ]; then
+        mv -f -- "$tlp_settings_backup_file" "$tlp_settings_config_file"
+        tlp_settings_backup_file=""
+    else
+        rm -f -- "$tlp_settings_config_file"
+    fi
+}
+
+tlp_settings_probe_enabled() {
+    awk -F '\t' '$1 == "meta" && $2 == "enabled" { print $3; exit }'
+}
+
+tlp_settings_probe_records() {
+    awk -F '\t' '
+        $1 == "setting" {
+            printf "%s", $2
+            for (i = 3; i <= NF; i++) printf "%s%s", (i == 3 ? "\t" : FS), $i
+            printf "\n"
+        }
+    '
+}
+
+tlp_settings_verify_records() {
+    local records=$1 probe_output effective_records managed_json effective_json
+
+    probe_output=$(run_tlp_settings_probe 2>/dev/null) || return 1
+    effective_records=$(printf '%s\n' "$probe_output" | tlp_settings_probe_records)
+    managed_json=$(sed '/^$/d' "$records" | tlp_settings_records_json) || return 1
+    effective_json=$(printf '%s\n' "$effective_records" | sed '/^$/d' | tlp_settings_records_json) || return 1
+
+    jq -ne --argjson managed "$managed_json" --argjson effective "$effective_json" '
+        $managed
+        | to_entries
+        | all(. as $entry | $effective[$entry.key] == $entry.value)
+    ' >/dev/null
+}
+
+tlp_settings_rollback() {
+    local previous_enabled=${1:-1}
+    local rollback_output="" rollback_rc=0
+
+    tlp_settings_restore_owned_file || rollback_rc=1
+    if [ "$previous_enabled" = 1 ]; then
+        rollback_output=$(run_tlp_start 2>&1) || rollback_rc=1
+        if [ "$rollback_rc" -eq 0 ] && tlp_output_has_policy_error "$rollback_output"; then
+            rollback_rc=1
+        fi
+    fi
+    return "$rollback_rc"
+}
+
+tlp_settings_apply() {
+    local records probe_output version previous_enabled next_enabled
+    local operation key value validation_rc apply_output="" apply_rc=0 rollback_rc=0
+    local settings_changed=0 charge_changed=0 charge_operation="" requested_stop=""
+    local target_start="" target_stop="" expected_plugin="" expected_battery=""
+    local fullcharge_output="" fullcharge_rc=0 restore_output=""
+
+    [ "$#" -gt 0 ] || {
+        printf '%s\n' 'No TLP setting operations were provided.' >&2
+        return 2
+    }
+    tlp_settings_schema_ready || {
+        printf '%s\n' 'The iNiR TLP settings schema is unavailable.' >&2
+        return 1
+    }
+    if ! find_tlp_runtime || [ -z "$tlp_lib_dir" ]; then
+        printf '%s\n' 'TLP or its internal runtime is not installed.' >&2
+        return 1
+    fi
+
+    version=$("$tlp_bin" --version 2>/dev/null | awk '/^TLP version / { print $3; exit }')
+    tlp_version_value_supported "$version" || {
+        printf 'Unsupported TLP version: %s.\n' "${version:-unknown}" >&2
+        return 1
+    }
+
+    records=$(mktemp) || return 1
+    if ! tlp_settings_managed_records "$version" > "$records"; then
+        rm -f -- "$records"
+        return 1
+    fi
+
+    while [ "$#" -gt 0 ]; do
+        operation=$1
+        shift
+        case "$operation" in
+            --charge-set)
+                [ "$#" -ge 1 ] || {
+                    rm -f -- "$records"
+                    usage
+                    return $?
+                }
+                [ -z "$charge_operation" ] || {
+                    printf '%s\n' 'Only one battery charge operation may be applied per transaction.' >&2
+                    rm -f -- "$records"
+                    return 2
+                }
+                requested_stop=$1
+                shift
+                is_uint "$requested_stop" &&
+                    [ "$requested_stop" -ge 1 ] &&
+                    [ "$requested_stop" -le 100 ] || {
+                    printf '%s\n' 'Invalid charge limit value.' >&2
+                    rm -f -- "$records"
+                    return 2
+                }
+                charge_operation=set
+                ;;
+            --charge-disable)
+                [ -z "$charge_operation" ] || {
+                    printf '%s\n' 'Only one battery charge operation may be applied per transaction.' >&2
+                    rm -f -- "$records"
+                    return 2
+                }
+                charge_operation=disable
+                ;;
+            --set)
+                [ "$#" -ge 2 ] || {
+                    rm -f -- "$records"
+                    usage
+                    return $?
+                }
+                key=$1
+                value=$2
+                shift 2
+                tlp_settings_validate_value "$key" "$value" "$version" 1 || {
+                    validation_rc=$?
+                    rm -f -- "$records"
+                    return "$validation_rc"
+                }
+                tlp_settings_update_record "$records" set "$key" "$value" || {
+                    rm -f -- "$records"
+                    return 1
+                }
+                settings_changed=1
+                ;;
+            --unset)
+                [ "$#" -ge 1 ] || {
+                    rm -f -- "$records"
+                    usage
+                    return $?
+                }
+                key=$1
+                shift
+                tlp_settings_definition "$key" >/dev/null || {
+                    printf 'Unknown TLP setting: %s.\n' "$key" >&2
+                    rm -f -- "$records"
+                    return 2
+                }
+                tlp_settings_update_record "$records" unset "$key" || {
+                    rm -f -- "$records"
+                    return 1
+                }
+                settings_changed=1
+                ;;
+            *)
+                printf 'Unknown TLP settings operation: %s.\n' "$operation" >&2
+                rm -f -- "$records"
+                return 2
+                ;;
+        esac
+    done
+
+    probe_output=$(run_tlp_settings_probe 2>/dev/null) || {
+        rm -f -- "$records"
+        printf '%s\n' 'The effective TLP configuration could not be read.' >&2
+        return 1
+    }
+    previous_enabled=$(printf '%s\n' "$probe_output" | tlp_settings_probe_enabled)
+
+    case "$charge_operation" in
+        set)
+            if ! load_probe || [ "$supported" -ne 1 ]; then
+                rm -f -- "$records"
+                printf 'TLP battery charge control is unavailable (%s).\n' "${reason:-probe-failed}" >&2
+                return 1
+            fi
+            target_stop=$(normalize_requested_stop "$requested_stop") || {
+                validation_rc=$?
+                rm -f -- "$records"
+                return "$validation_rc"
+            }
+            target_start=$(choose_start "$target_stop") || {
+                validation_rc=$?
+                rm -f -- "$records"
+                return "$validation_rc"
+            }
+            expected_plugin=$probe_plugin
+            expected_battery=$probe_config_battery
+            stage_policy "$target_start" "$target_stop" "$expected_battery" "$expected_plugin" || {
+                rm -f -- "$records"
+                printf '%s\n' 'Could not stage the iNiR battery charge policy.' >&2
+                return 1
+            }
+            charge_changed=1
+            ;;
+        disable)
+            if [ -f "$config_file" ]; then
+                stage_policy_removal || {
+                    rm -f -- "$records"
+                    printf '%s\n' 'Could not stage removal of the iNiR battery charge policy.' >&2
+                    return 1
+                }
+                charge_changed=1
+            fi
+            ;;
+    esac
+
+    if [ "$settings_changed" -eq 1 ]; then
+        tlp_settings_write_records "$records" || {
+            [ "$charge_changed" -eq 0 ] || restore_policy_file || true
+            rm -f -- "$records"
+            printf '%s\n' 'Could not write the iNiR TLP settings drop-in.' >&2
+            return 1
+        }
+    fi
+
+    # A charge-only disable which no longer owns a drop-in is already in the
+    # requested state and needs neither a TLP restart nor hardware mutation.
+    if [ "$settings_changed" -eq 0 ] && [ "$charge_changed" -eq 0 ]; then
+        rm -f -- "$records"
+        return 0
+    fi
+
+    probe_output=$(run_tlp_settings_probe 2>/dev/null) || apply_rc=1
+    if [ "$apply_rc" -eq 0 ]; then
+        next_enabled=$(printf '%s\n' "$probe_output" | tlp_settings_probe_enabled)
+        if [ "$charge_operation" = set ] && [ "$next_enabled" != 1 ]; then
+            printf '%s\n' 'Enabling battery charge care cannot be combined with disabling TLP.' >&2
+            apply_rc=1
+        fi
+    fi
+    if [ "$apply_rc" -eq 0 ] && [ "$charge_operation" = disable ] && [ "$charge_changed" -eq 1 ]; then
+        fullcharge_output=$(run_tlp_fullcharge 2>&1) || fullcharge_rc=$?
+        if [ "$fullcharge_rc" -ne 0 ]; then
+            printf '%s\n' 'Warning: TLP could not restore vendor full-charge thresholds; continuing with remaining TLP configuration.' >&2
+        fi
+        [ -z "$fullcharge_output" ] || printf '%s\n' "$fullcharge_output" >&2
+    fi
+    if [ "$apply_rc" -eq 0 ]; then
+        if [ "$next_enabled" = 1 ]; then
+            apply_output=$(run_tlp_start 2>&1) || apply_rc=$?
+            if [ "$apply_rc" -eq 0 ] && tlp_output_has_policy_error "$apply_output"; then
+                apply_rc=1
+            fi
+            if [ "$apply_rc" -ne 0 ]; then
+                [ -z "$apply_output" ] || printf '%s\n' "$apply_output" >&2
+            fi
+        fi
+    fi
+    if [ "$apply_rc" -eq 0 ] && [ "$settings_changed" -eq 1 ] &&
+        ! tlp_settings_verify_records "$records"; then
+        apply_rc=1
+    fi
+    if [ "$apply_rc" -eq 0 ] && [ "$charge_operation" = set ]; then
+        if ! load_probe ||
+            [ "$supported" -ne 1 ] ||
+            [ "$state_known" -ne 1 ] ||
+            [ "$probe_plugin" != "$expected_plugin" ] ||
+            [ "$probe_config_battery" != "$expected_battery" ] ||
+            [ "$probe_current_stop" != "$target_stop" ] ||
+            { [ -n "$target_start" ] && [ "$probe_current_start" != "$target_start" ]; }; then
+            apply_rc=1
+        fi
+    fi
+    if [ "$apply_rc" -eq 0 ] && [ "$charge_operation" = disable ] && [ -e "$config_file" ]; then
+        apply_rc=1
+    fi
+
+    rm -f -- "$records"
+    if [ "$apply_rc" -ne 0 ]; then
+        if [ "$settings_changed" -eq 1 ]; then
+            tlp_settings_restore_owned_file || rollback_rc=1
+        fi
+        if [ "$charge_changed" -eq 1 ]; then
+            restore_policy_file || rollback_rc=1
+            # If this transaction introduced a threshold where no iNiR charge
+            # file existed before, reset the hardware before re-applying the
+            # restored TLP configuration.
+            if [ "$had_config" -eq 0 ]; then
+                restore_output=$(run_tlp_fullcharge 2>&1) || rollback_rc=1
+                [ -z "$restore_output" ] || printf '%s\n' "$restore_output" >&2
+            fi
+        fi
+        if [ "$previous_enabled" = 1 ]; then
+            restore_output=$(run_tlp_start 2>&1) || rollback_rc=1
+            if [ "$rollback_rc" -eq 0 ] && tlp_output_has_policy_error "$restore_output"; then
+                rollback_rc=1
+            fi
+            if [ "$rollback_rc" -ne 0 ]; then
+                [ -z "$restore_output" ] || printf '%s\n' "$restore_output" >&2
+            fi
+        fi
+        printf '%s\n' 'TLP rejected the requested batch; previous configuration restored.' >&2
+        [ "$rollback_rc" -eq 0 ] || printf '%s\n' 'Warning: re-applying the previous TLP configuration also failed.' >&2
+        return 1
+    fi
+
+    [ "$settings_changed" -eq 0 ] || [ -z "$tlp_settings_backup_file" ] || rm -f -- "$tlp_settings_backup_file"
+    tlp_settings_backup_file=""
+    [ "$charge_changed" -eq 0 ] || [ -z "$backup_file" ] || rm -f -- "$backup_file"
+    backup_file=""
+    return 0
+}
+
+tlp_settings_reset() {
+    local probe_output enabled apply_output="" apply_rc=0
+
+    rm -f -- "$tlp_settings_config_file" || return 1
+    if ! find_tlp_runtime || [ -z "$tlp_lib_dir" ]; then
+        printf '%s\n' 'iNiR TLP settings removed, but TLP is unavailable.' >&2
+        return 1
+    fi
+    tlp_settings_schema_ready || {
+        printf '%s\n' 'iNiR TLP settings removed, but the settings schema is unavailable.' >&2
+        return 1
+    }
+
+    probe_output=$(run_tlp_settings_probe 2>/dev/null) || {
+        printf '%s\n' 'iNiR TLP settings removed, but the remaining TLP configuration is unreadable.' >&2
+        return 1
+    }
+    enabled=$(printf '%s\n' "$probe_output" | tlp_settings_probe_enabled)
+    if [ "$enabled" = 1 ]; then
+        apply_output=$(run_tlp_start 2>&1) || apply_rc=$?
+        [ -z "$apply_output" ] || printf '%s\n' "$apply_output" >&2
+        if [ "$apply_rc" -ne 0 ] || tlp_output_has_policy_error "$apply_output"; then
+            printf '%s\n' 'iNiR TLP settings removed, but re-applying the remaining TLP configuration failed.' >&2
+            return 1
+        fi
+    fi
+    return 0
+}
+
+acquire_tlp_settings_lock() {
+    command -v flock >/dev/null 2>&1 || {
+        printf '%s\n' 'flock is required to change iNiR TLP settings.' >&2
+        return 1
+    }
+    exec 9>"$tlp_settings_lock" || return 1
+    flock -w 10 9 || {
+        printf '%s\n' 'Another iNiR TLP settings operation is still running.' >&2
+        return 1
+    }
+}
+
+main() {
+    set -eu
+    PATH=/usr/sbin:/usr/bin:/sbin:/bin
+    export PATH
+    umask 022
+    trap cleanup EXIT
+    trap 'cleanup; exit 1' HUP INT TERM
+
+    case "${1:-}" in
+        --status)
+            [ "$#" -eq 1 ] || { usage; return $?; }
+            status
+            ;;
+        --config-status)
+            [ "$#" -eq 1 ] || { usage; return $?; }
+            tlp_settings_status
+            ;;
+        --set)
+            [ "$#" -eq 2 ] || { usage; return $?; }
+            [ "$(id -u)" -eq 0 ] || {
+                printf '%s\n' 'Changing the battery charge policy requires root privileges.' >&2
+                return 1
+            }
+            acquire_tlp_settings_lock || return $?
+            if ! find_tlp_runtime || [ -z "$tlp_lib_dir" ]; then
+                printf '%s\n' 'TLP or its internal runtime is not installed.' >&2
+                return 1
+            fi
+            set_policy "$2"
+            ;;
+        --disable)
+            [ "$#" -eq 1 ] || { usage; return $?; }
+            [ "$(id -u)" -eq 0 ] || {
+                printf '%s\n' 'Changing the battery charge policy requires root privileges.' >&2
+                return 1
+            }
+            acquire_tlp_settings_lock || return $?
+            disable_policy
+            ;;
+        --config-apply)
+            [ "$#" -gt 1 ] || { usage; return $?; }
+            [ "$(id -u)" -eq 0 ] || {
+                printf '%s\n' 'Changing TLP settings requires root privileges.' >&2
+                return 1
+            }
+            acquire_tlp_settings_lock || return $?
+            shift
+            tlp_settings_apply "$@"
+            ;;
+        --config-reset)
+            [ "$#" -eq 1 ] || { usage; return $?; }
+            [ "$(id -u)" -eq 0 ] || {
+                printf '%s\n' 'Changing TLP settings requires root privileges.' >&2
+                return 1
+            }
+            acquire_tlp_settings_lock || return $?
+            tlp_settings_reset
+            ;;
+        *)
+            usage
+            ;;
+    esac
+}
+
+# Keeping main behind the installed basename lets the regression tests source
+# the pure adapter functions without introducing a test-only privileged mode.
+if [ "${0##*/}" = inir-battery-charge-limit ]; then
+    main "$@"
+fi

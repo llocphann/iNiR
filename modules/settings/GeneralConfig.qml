@@ -159,59 +159,6 @@ ContentPage {
                     }
                 }
             }
-
-            SettingsDivider {}
-
-            ConfigRow {
-                enabled: Battery.chargeLimitSupported
-                uniform: false
-                Layout.fillWidth: false
-                SettingsSwitch {
-                    buttonIcon: "battery_saver"
-                    text: Translation.tr("Charge limit")
-                    checked: Config.options?.battery?.chargeLimit?.enable ?? false
-                    autoToggle: false
-                    onToggledByUser: checked => Config.setNestedValue("battery.chargeLimit.enable", checked)
-                    StyledToolTip {
-                        text: !Battery.chargeLimitSupported
-                            ? Translation.tr("Not supported on this device")
-                            : Battery.chargeLimitAdjustable
-                                ? Translation.tr("Stop charging at a specific percentage to extend battery lifespan (requires polkit)")
-                                : Translation.tr("Use your device's built-in battery conservation mode (requires polkit)")
-                    }
-                }
-                ConfigSpinBox {
-                    property bool _ready: false
-                    visible: Battery.chargeLimitAdjustable
-                    enabled: (Config.options?.battery?.chargeLimit?.enable ?? false) && Battery.chargeLimitAdjustable
-                    icon: "speed"
-                    text: Translation.tr("at")
-                    value: Config.options?.battery?.chargeLimit?.threshold ?? 80
-                    from: 20
-                    to: 100
-                    stepSize: 5
-                    Component.onCompleted: _ready = true
-                    onValueChanged: {
-                        if (_ready && value !== (Config.options?.battery?.chargeLimit?.threshold ?? 80))
-                            Config.setNestedValue("battery.chargeLimit.threshold", value);
-                    }
-                    StyledToolTip {
-                        text: Translation.tr("Maximum charge percentage")
-                    }
-                }
-            }
-
-            StyledText {
-                visible: Battery.chargeLimitSupported
-                Layout.leftMargin: 16
-                text: Battery.chargeLimitActive
-                    ? (Battery.currentChargeLimit > 0 && Battery.currentChargeLimit < 100
-                        ? Translation.tr("Current limit: %1%").arg(Battery.currentChargeLimit)
-                        : Translation.tr("Battery conservation mode active"))
-                    : Translation.tr("No charge limit active")
-                font.pixelSize: Appearance.font.pixelSize.smaller
-                color: Appearance.colors.colSubtext
-            }
         }
     }
     

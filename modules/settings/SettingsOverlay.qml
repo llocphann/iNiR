@@ -36,6 +36,8 @@ Scope {
             _closeAnimRunning = false
             closeAnimTimer.stop()
         } else {
+            if (TlpSettingsService.hasPendingChanges)
+                TlpSettingsService.applyOnLeave()
             _closeAnimRunning = true
             closeAnimTimer.restart()
         }
@@ -1863,6 +1865,11 @@ Scope {
     }
 
     onOverlayCurrentPageChanged: {
+        if (root._navigationInitialized
+                && root._prevPage === 27
+                && root.overlayCurrentPage !== 27
+                && TlpSettingsService.hasPendingChanges)
+            TlpSettingsService.applyOnLeave()
         root._slideDir = root.overlayCurrentPage > root._prevPage ? 1 : -1
         root._prevPage = root.overlayCurrentPage
         root._persistOverlayPage()

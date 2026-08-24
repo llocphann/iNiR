@@ -18,9 +18,19 @@ step "shell syntax"
 bash -n \
     "$runtime_root/setup" \
     "$runtime_root/scripts/inir" \
+    "$runtime_root/scripts/test-tlp-integration-lifecycle.sh" \
     "$runtime_root/sdata/lib/"*.sh \
     "$runtime_root/sdata/subcmd-install/"*.sh \
     "$runtime_root/sdata/migrations/"*.sh
+sh -n \
+    "$runtime_root/assets/helpers/inir-battery-charge-limit" \
+    "$runtime_root/scripts/test-battery-charge-limit-helper.sh"
+
+step "battery charge-limit helper"
+sh "$runtime_root/scripts/test-battery-charge-limit-helper.sh"
+
+step "TLP integration lifecycle"
+bash "$runtime_root/scripts/test-tlp-integration-lifecycle.sh"
 
 step "session tray ordering"
 service_unit="$runtime_root/assets/systemd/inir.service"
@@ -291,7 +301,8 @@ for agent_file in "${agent_files[@]}"; do
 done
 # Maintainer and development tooling must be stripped by both install paths.
 dev_tooling_files=(release.sh wiki-sync.sh verify-docs.sh qml-check.fish
-    test-local-distribution.sh test-mascot-pack-flow.sh)
+    test-local-distribution.sh test-mascot-pack-flow.sh
+    test-battery-charge-limit-helper.sh test-tlp-integration-lifecycle.sh)
 dev_tooling_dirs=(agents tools l10n)
 for tool in "${dev_tooling_files[@]}" "${dev_tooling_dirs[@]}"; do
     pattern="--exclude='/$tool'"
