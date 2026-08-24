@@ -19,9 +19,6 @@ Singleton {
     // is false; that made every category appear empty in the settings UI.
     property var categories: []
     readonly property var navigationCategories: {
-        // Put the device's charge policy and the most commonly tuned power
-        // domains first. The schema itself keeps TLPUI's source order so the
-        // helper and attribution data remain easy to audit.
         const preferredOrder = [
             "battery-care", "general", "processor", "graphics", "disks",
             "pcie", "usb", "network", "radio", "radio-device-wizard", "audio"
@@ -37,9 +34,7 @@ Singleton {
     }
     property var effectiveValues: ({})
     property var managedValues: ({})
-    // Runtime-only choices reported by the privileged helper's unprivileged
-    // status path. Platform profiles are firmware/kernel capabilities, so the
-    // UI must not pretend the three common names are exhaustive.
+    // Platform-profile choices are runtime firmware capabilities, not a fixed list.
     property var runtimeValues: ({})
     property var pendingValues: ({})
     property var pendingChargePolicy: null
@@ -56,7 +51,6 @@ Singleton {
     property string lastError: ""
     property bool _refreshPending: false
     property string _mutationKind: ""
-    property bool _discardOnFailure: false
 
     readonly property bool hasPendingChanges: Object.keys(root.pendingValues).length > 0
         || root.pendingChargePolicy !== null
@@ -68,7 +62,6 @@ Singleton {
     readonly property bool canResetOverrides: root.managedConfigPresent
         && !root.hasPendingChanges
         && !root.busy
-    readonly property bool applyingOnLeave: root.busy && root._mutationKind === "apply-on-leave"
 
     function _clone(value): var {
         return JSON.parse(JSON.stringify(value ?? {}))
@@ -121,9 +114,8 @@ Singleton {
         }
 
         if (key.startsWith("DISK_IDLE_SECS_")) {
-            // TLP 1.10 explicitly says not to change this legacy laptop-mode
-            // setting, and kernel 7.0 ignores it. Keep only an existing/staged
-            // iNiR override visible so users can remove old ownership.
+            // TLP 1.10 discourages this legacy setting and kernel 7.0 ignores it;
+            // keep only an owned/staged row so an old override remains removable.
             return root._keepUnavailableSetting(key)
         }
 
@@ -131,10 +123,8 @@ Singleton {
                 && root.statusLoaded
                 && Object.prototype.hasOwnProperty.call(root.runtimeValues, key)
                 && root._array(root.runtimeValues[key]).length === 0) {
-            // TLP may still populate intrinsic PLATFORM_PROFILE defaults on a
-            // machine with no platform-profile firmware interface. Do not let
-            // those defaults create fake UI capabilities. Keep only an iNiR-
-            // owned/staged row visible so a stale override remains removable.
+            // Intrinsic defaults can exist without firmware support; keep only
+            // owned/staged rows so stale overrides remain removable.
             return root._keepUnavailableSetting(key)
         }
 
@@ -360,8 +350,6 @@ Singleton {
             DISK_APM_LEVEL_ON_BAT: "128 128",
             DISK_SPINDOWN_TIMEOUT_ON_AC: "0 0",
             DISK_SPINDOWN_TIMEOUT_ON_BAT: "0 0",
-            // TLP's documented default is keep. It is also the safest example:
-            // it demonstrates the syntax without changing the kernel scheduler.
             DISK_IOSCHED: "keep",
             SATA_LINKPWR_DENYLIST: "host1",
             BAY_DEVICE: "sr0",
@@ -392,18 +380,13 @@ Singleton {
                 ? root._array(root.runtimeValues[key]).map(value => String(value))
                 : root._array(definition?.values).map(value => String(value))
 
-        // TLP 1.10 documents userspace for passive/guided pstate and
-        // acpi-cpufreq even though TLPUI 1.10's static schema omitted it. A
-        // successful sysfs capability probe is more authoritative than this
-        // fallback, so only augment the static-schema path.
+        // TLP documents "userspace" here even though TLPUI 1.10 omits it.
         if (!hasCapabilityValues
                 && key.startsWith("CPU_SCALING_GOVERNOR_")
                 && !result.includes("userspace"))
             result.push("userspace")
 
-        // Preserve an effective or staged value even if hardware capabilities
-        // changed since it was configured. This keeps the real TLP state
-        // visible and lets the user explicitly remove the stale override.
+        // Preserve stale owned/staged values so users can still unset them.
         const current = String(root.value(key) ?? "").trim()
         if (current.length > 0) {
             for (const token of current.split(/\s+/)) {
@@ -508,9 +491,7 @@ Singleton {
         if (pending !== undefined) {
             if (pending.managed === true)
                 return String(pending.value ?? "")
-            // Keep the last effective value visible while an unset is staged;
-            // the value inherited after Apply is authoritative only after TLP
-            // has re-read its remaining configuration files.
+            // Inherited post-Apply state is authoritative only after TLP re-reads config.
             return String(root.effectiveValues[key] ?? root.managedValues[key] ?? "")
         }
         if (Object.prototype.hasOwnProperty.call(root.managedValues, key))
@@ -596,7 +577,7 @@ Singleton {
         statusProcess.running = true
     }
 
-    function _startApply(kind: string, discardOnFailure: bool): bool {
+    function _startApply(kind: string): bool {
         if (root.busy || !root.hasPendingChanges)
             return false
 
@@ -619,25 +600,13 @@ Singleton {
         root.busy = true
         root.lastError = ""
         root._mutationKind = kind
-        root._discardOnFailure = discardOnFailure
         mutationProcess.command = command
         mutationProcess.running = true
         return true
     }
 
     function apply(): bool {
-        return root._startApply("apply", false)
-    }
-
-    function applyOnLeave(): bool {
-        if (root.busy) {
-            if (root._mutationKind === "apply") {
-                root._mutationKind = "apply-on-leave"
-                root._discardOnFailure = false
-            }
-            return false
-        }
-        return root._startApply("apply-on-leave", false)
+        return root._startApply("apply")
     }
 
     function reset(): void {
@@ -646,7 +615,6 @@ Singleton {
         root.busy = true
         root.lastError = ""
         root._mutationKind = "reset"
-        root._discardOnFailure = false
         mutationProcess.command = ["/usr/bin/pkexec", root.helperPath, "--config-reset"]
         mutationProcess.running = true
     }
@@ -744,19 +712,16 @@ Singleton {
 
         onExited: (exitCode, exitStatus) => {
             const kind = root._mutationKind
-            const discardOnFailure = root._discardOnFailure
             const success = exitCode === 0
             const appliedChargePolicy = root.pendingChargePolicy === null
                 ? null : root._clone(root.pendingChargePolicy)
             root.busy = false
             if (success) {
                 root.pendingValues = ({})
-                if (kind === "apply" || kind === "apply-on-leave") {
+                if (kind === "apply") {
                     root.pendingChargePolicy = null
                     if (appliedChargePolicy !== null) {
-                        // Refresh first. The Config notification then waits for
-                        // this authoritative status read instead of launching a
-                        // second privileged charge-policy reconciliation.
+                        // Refresh authoritative status before Config can reconcile again.
                         TlpService.refresh()
                         Config.setNestedValues({
                             "battery.chargeLimit.enable": appliedChargePolicy.enabled === true,
@@ -769,13 +734,8 @@ Singleton {
                 const detail = mutationError.text.trim() || mutationOutput.text.trim()
                 root.lastError = detail || "TLP settings operation failed (exit code " + exitCode + ")"
                 console.warn("[TLP Settings]", root.lastError)
-                if (discardOnFailure) {
-                    root.pendingValues = ({})
-                    root.pendingChargePolicy = null
-                }
             }
             root._mutationKind = ""
-            root._discardOnFailure = false
             root.refresh()
             root.mutationFinished(kind, success)
         }

@@ -32,8 +32,6 @@ ApplicationWindow {
         return entry;
     })
     property int currentPage: 0
-    property int _previousPage: 0
-    property bool _quitAfterTlpMutation: false
     property int _requestedStartPage: -1
     property string _requestedStartSection: ""
     property bool _navigationInitialized: false
@@ -58,15 +56,7 @@ ApplicationWindow {
         }
     }
 
-    onCurrentPageChanged: {
-        if (root._navigationInitialized
-                && root._previousPage === 27
-                && root.currentPage !== 27
-                && TlpSettingsService.hasPendingChanges)
-            TlpSettingsService.applyOnLeave()
-        root._previousPage = root.currentPage
-        root._persistCurrentPage()
-    }
+    onCurrentPageChanged: root._persistCurrentPage()
     property bool uiReady: Config.ready
 
     // Easy mode helpers — derived list filtered to essentials when on
@@ -451,19 +441,7 @@ ApplicationWindow {
     }
 
     visible: true
-    onClosing: close => {
-        if (root._quitAfterTlpMutation) {
-            close.accepted = false
-            return
-        }
-        if (TlpSettingsService.busy || TlpSettingsService.hasPendingChanges) {
-            close.accepted = false
-            root._quitAfterTlpMutation = true
-            TlpSettingsService.applyOnLeave()
-            return
-        }
-        Qt.quit()
-    }
+    onClosing: Qt.quit()
     title: "illogical-impulse Settings"
 
     Component.onCompleted: {
@@ -480,19 +458,6 @@ ApplicationWindow {
     Connections {
         target: Persistent
         function onReadyChanged() { root.initializeNavigation() }
-    }
-
-    Connections {
-        target: TlpSettingsService
-
-        function onMutationFinished(kind, success): void {
-            if (!root._quitAfterTlpMutation)
-                return
-            if (!success && TlpSettingsService.hasPendingChanges)
-                TlpSettingsService.discard()
-            root._quitAfterTlpMutation = false
-            Qt.quit()
-        }
     }
 
     // Apply theme when Config is ready

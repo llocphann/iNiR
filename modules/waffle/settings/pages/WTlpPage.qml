@@ -17,8 +17,6 @@ WSettingsPage {
 
     property int selectedCategoryIndex: 0
     property string filterText: ""
-    property bool _categoryReady: false
-    property int _previousCategoryIndex: 0
 
     readonly property string profileGuidanceSource: "When overriding this group, set every shown profile together to avoid values spilling between TLP profiles."
     readonly property var selectedCategory: {
@@ -68,19 +66,7 @@ WSettingsPage {
         root.selectedCategoryIndex = index
     }
 
-    onSelectedCategoryIndexChanged: {
-        if (root._categoryReady
-                && root._previousCategoryIndex !== root.selectedCategoryIndex
-                && TlpSettingsService.hasPendingChanges)
-            TlpSettingsService.applyOnLeave()
-        root._previousCategoryIndex = root.selectedCategoryIndex
-        root.filterText = ""
-    }
-
-    Component.onCompleted: {
-        root._previousCategoryIndex = root.selectedCategoryIndex
-        root._categoryReady = true
-    }
+    onSelectedCategoryIndexChanged: root.filterText = ""
 
     WSettingsInfoBar {
         severity: TlpSettingsService.configAvailable

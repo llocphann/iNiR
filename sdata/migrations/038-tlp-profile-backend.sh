@@ -1,12 +1,6 @@
-# Migration: Enable TLP and its desktop-compatible profile/radio backends.
-# TLP 1.9+ provides tlp-pd, which implements the same D-Bus API used by
-# Quickshell.Services.UPower.PowerProfiles. TLP's Radio Device Wizard (tlp-rdw)
-# is driven by NetworkManager's dispatcher on distributions which package it.
-#
-# TLP upstream explicitly treats power-profiles-daemon as conflicting and, on
-# Arch, recommends masking systemd-rfkill units for reliable radio switching.
-# Keep those system-level prerequisites in the setup migration rather than in
-# the user-writable Quickshell runtime.
+# Enable TLP's Power Profiles and radio backends.
+# tlp-pd implements the standard Power Profiles D-Bus API; TLP documents PPD
+# conflicts and recommends masking systemd-rfkill on Arch for radio switching.
 
 MIGRATION_ID="038-tlp-profile-backend"
 MIGRATION_TITLE="Enable TLP power management"
@@ -39,17 +33,13 @@ _tlp_radio_backend_available() {
 }
 
 migration_check() {
-  # This repository supports distributions where tlp-pd is not packaged yet.
-  # Treat that as "not applicable", not as a required-migration failure. If the
-  # packages appear later, required migrations are re-checked and this will run.
+  # Missing tlp-pd means this migration is not applicable yet.
   _tlp_profile_backend_available || return 1
 
   systemctl is-enabled --quiet tlp.service 2>/dev/null || return 0
   systemctl is-enabled --quiet tlp-pd.service 2>/dev/null || return 0
 
-  # TLP >= 1.6 deliberately skips overlapping platform/CPU settings when the
-  # real power-profiles-daemon process is running. Do not leave a service which
-  # can reclaim the same D-Bus/kernel controls enabled beside tlp-pd.
+  # Do not leave competing PPD implementations enabled beside tlp-pd.
   if _tlp_unit_exists power-profiles-daemon.service \
       && ! _tlp_unit_masked power-profiles-daemon.service; then
     return 0
@@ -64,8 +54,7 @@ migration_check() {
     return 0
   fi
 
-  # TLP's Arch installation guidance recommends masking systemd-rfkill to keep
-  # radio state restoration from racing TLP's own switching rules.
+  # Avoid systemd-rfkill racing TLP radio restoration on Arch.
   if _tlp_unit_exists systemd-rfkill.service \
       && ! _tlp_unit_masked systemd-rfkill.service; then
     return 0
@@ -131,9 +120,7 @@ migration_apply() {
     return 0
   fi
 
-  # Stop/mask competing D-Bus implementations before starting tlp-pd. This is
-  # exactly the fallback TLP recommends on distributions which permit parallel
-  # package installation. If the package manager already removed them, no-op.
+  # Stop competing PPD implementations before starting tlp-pd.
   for unit in power-profiles-daemon.service tuned-ppd.service; do
     if _tlp_unit_exists "$unit" && ! _tlp_unit_masked "$unit"; then
       pkg_sudo systemctl mask --now "$unit" || return 1

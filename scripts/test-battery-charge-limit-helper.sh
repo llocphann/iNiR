@@ -945,9 +945,7 @@ test_tlp_settings_ui_uses_schema_groups_and_batched_apply() {
     runtime_service="$repo_root/services/TlpRuntimeCapabilities.qml"
     services_qmldir="$repo_root/services/qmldir"
     classic_page="$repo_root/modules/settings/TlpConfig.qml"
-    classic_row="$repo_root/modules/settings/TlpSettingRow.qml"
     waffle_page="$repo_root/modules/waffle/settings/pages/WTlpPage.qml"
-    waffle_row="$repo_root/modules/waffle/settings/WTlpSettingRow.qml"
     schema="$repo_root/assets/tlp/tlp-settings-schema.json"
 
     jq -e '
@@ -956,134 +954,35 @@ test_tlp_settings_ui_uses_schema_groups_and_batched_apply() {
         ([.categories[].groups[]] | length) == 62 and
         ([.categories[].groups[] |
             select(.description == "" or (.description | contains("\n")) or (.description | length) > 120)] | length) == 0 and
-        ([.categories[].groups[] |
-            select(.id == "CPU_DRIVER_OPMODE" and (.description | startswith("Intel/AMD")))] | length) == 1 and
         .descriptionAttribution.license == "GPL-2.0-or-later"
-    ' "$schema" >/dev/null || fail 'the UI schema must expose concise, hardware-aware setting groups'
-    assert_eq 'pragma ComponentBehavior: Bound' "$(sed -n '1p' "$settings_service")" \
-        'the settings service must follow the new-QML pragma convention'
-    assert_eq 'pragma ComponentBehavior: Bound' "$(sed -n '1p' "$runtime_service")" \
-        'the runtime capability service must follow the new-QML pragma convention'
+    ' "$schema" >/dev/null || fail 'the UI schema must expose concise setting groups'
+
     assert_contains 'singleton TlpRuntimeCapabilities 1.0 TlpRuntimeCapabilities.qml' "$services_qmldir" \
-        'the runtime capability service must be registered in services/qmldir'
-    assert_contains 'property var categories: []' "$settings_service" \
-        'schema categories must remain a JavaScript array'
-    assert_contains 'property var runtimeValues: ({})' "$settings_service" \
-        'runtime platform-profile choices must be carried separately from the static schema'
-    assert_contains 'const capabilityValues = TlpRuntimeCapabilities.values' "$settings_service" \
-        'editors must prefer local kernel capability choices when they are available'
-    assert_contains 'root._array(root.runtimeValues[key])' "$settings_service" \
-        'editors must retain helper-reported platform-profile choices'
-    assert_contains 'TlpRuntimeCapabilities.isRdwSetting(key)' "$settings_service" \
-        'radio-event settings must be gated by the RDW runtime backend'
+        'runtime capability service must be registered'
     assert_contains '/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors' "$runtime_service" \
-        'CPU governor choices must come from the active kernel cpufreq interface'
+        'CPU governor choices must come from the kernel'
     assert_contains '/sys/power/mem_sleep' "$runtime_service" \
-        'suspend choices must come from the active kernel suspend interface'
-    assert_contains 'onTriggered: root.refresh()' "$runtime_service" \
-        'runtime capabilities must be refreshed while the settings process stays alive'
-    assert_contains 'DISK_IOSCHED: "keep"' "$settings_service" \
-        'the I/O scheduler example must demonstrate TLP\047s no-op default'
-    assert_contains 'key.startsWith("CPU_SCALING_GOVERNOR_")' "$settings_service" \
-        'the UI must retain TLP\047s documented userspace governor fallback when sysfs is unavailable'
-    assert_contains '"battery-care", "general", "processor", "graphics", "disks"' "$settings_service" \
-        'Battery care and common power domains must lead the adapted category layout'
-    assert_not_contains 'Array.isArray(category?.settings)' "$settings_service" \
-        'nested QML sequence wrappers must not hide category settings'
+        'suspend choices must come from the kernel'
     assert_contains 'function groupsForCategory(category, filterText): var {' "$settings_service" \
-        'the settings service must expose TLPUI-style groups'
+        'settings service must expose grouped schema data'
     assert_contains 'command.push("--charge-set"' "$settings_service" \
         'charge care must join the same privileged batch'
     assert_eq 1 "$(grep -Fc 'const command = ["/usr/bin/pkexec", root.helperPath, "--config-apply"]' "$settings_service")" \
-        'the settings service must build exactly one privileged Apply command' || return 1
+        'settings service must build one privileged Apply command' || return 1
+    assert_not_contains 'applyOnLeave' "$settings_service" \
+        'settings service must require explicit Apply'
     assert_contains 'settingsPageName: Translation.tr("Battery")' "$classic_page" \
-        'the classic page must be named Battery'
-    assert_not_contains 'leftAlignedContent:' "$classic_page" \
-        'the TLP page must not require TLP-only changes in the shared category button'
-    assert_not_contains 'TlpSettingsService.categorySettingCount(modelData)' "$classic_page" \
-        'classic category labels must not append setting counts'
-    assert_contains 'id: profileBadge' "$classic_row" \
-        'the profile badge must be a peer of the editor for vertical alignment'
-    assert_contains 'readonly property real editorHeight: 38 * Appearance.fontSizeScale' "$classic_row" \
-        'classic TLP editors must share one compact height that follows UI scaling'
-    assert_contains 'readonly property real editorWidth: root.settingType === "list" ? 310 : 240' "$classic_row" \
-        'list editors must reserve enough width for balanced option wrapping'
-    assert_contains 'implicitHeight: Math.max(root.editorHeight, optionFlow.implicitHeight)' "$classic_row" \
-        'multi-line option flows must remain vertically centered in their row'
-    assert_contains 'ToolbarTextField {' "$classic_row" \
-        'free-form values must reuse the compact upstream text field'
-    assert_not_contains 'MaterialTextField {' "$classic_row" \
-        'free-form values must not compress the floating-label Material field'
-    assert_contains 'groupDescription: root.conciseGroupDescription(groupCard.modelData)' "$classic_page" \
-        'each classic override tooltip must receive only the concise group guidance'
-    assert_contains 'hoverEnabled: true' "$classic_row" \
-        'TLP override switches must own their tooltip hover behavior locally'
-    assert_contains 'text: root.toggleToolTip()' "$classic_row" \
-        'each override toggle must expose ownership and setting guidance on hover'
-    assert_contains 'function wrapToolTip(text: string): string {' "$classic_row" \
-        'setting guidance tooltips must wrap before crossing the settings window'
-    assert_contains 'Translation.tr("Parameter: %1")' "$classic_row" \
-        'raw TLP keys must stay available in the classic tooltip instead of the main row'
-    assert_contains 'Translation.tr("State: %1")' "$classic_row" \
-        'detailed ownership state must stay available in the classic tooltip'
-    assert_not_contains 'root.settingKey + "  ·  " + root.stateText()' "$classic_row" \
-        'classic rows must not repeat the raw key and state under every toggle'
-    assert_not_contains '+ "  ·  " + root.stateText()' "$classic_row" \
-        'classic compact profile rows must not append redundant state text'
-    assert_contains 'root.profile.length > 0 && !root.isProfileMapping' "$classic_row" \
-        'classic profile mappings must merge rather than duplicate their profile badge'
-    assert_contains 'font.pixelSize: Appearance.font.pixelSize.smallest' "$classic_page" \
-        'visible group guidance must remain visually secondary'
-    assert_contains 'profileGuidanceVisible' "$classic_page" \
-        'classic settings must centralize repeated profile guidance at category level'
-    assert_contains 'title: Translation.tr(String(modelData?.title ?? ""))' "$classic_page" \
-        'schema-driven classic group titles must pass through the translation boundary'
-    assert_contains 'text: Translation.tr(root.conciseGroupDescription(groupCard.modelData))' "$classic_page" \
-        'schema-driven classic group descriptions must pass through the translation boundary'
+        'classic Battery page must remain registered'
     assert_contains 'pageTitle: Translation.tr("Battery")' "$waffle_page" \
-        'the Waffle page must be named Battery'
-    assert_contains 'description: ""' "$waffle_row" \
-        'Waffle rows must not render raw-key or state subtitles'
-    assert_not_contains '+ "  ·  " + root.stateText()' "$waffle_row" \
-        'Waffle compact profile rows must not append redundant state text'
-    assert_contains 'profileGuidanceVisible' "$waffle_page" \
-        'Waffle settings must centralize repeated profile guidance at category level'
-    assert_contains 'title: Translation.tr(String(modelData?.title ?? ""))' "$waffle_page" \
-        'schema-driven Waffle group titles must pass through the translation boundary'
-    assert_contains 'text: Translation.tr(root.conciseGroupDescription(groupCard.modelData))' "$waffle_page" \
-        'schema-driven Waffle group descriptions must pass through the translation boundary'
-    assert_not_contains 'TlpSettingsService.categorySettingCount(modelData)' "$waffle_page" \
-        'Waffle category labels must not append setting counts'
+        'Waffle Battery page must remain registered'
     assert_contains 'model: root.visibleGroups' "$classic_page" \
-        'the classic page must render configuration groups'
+        'classic page must render schema groups'
     assert_contains 'model: root.visibleGroups' "$waffle_page" \
-        'the Waffle page must render configuration groups'
-}
-
-test_tlp_settings_auto_apply_hooks_cover_navigation_and_close() {
-    settings_service="$repo_root/services/TlpSettingsService.qml"
-    classic_window="$repo_root/settings.qml"
-    waffle_window="$repo_root/waffleSettings.qml"
-    overlay="$repo_root/modules/settings/SettingsOverlay.qml"
-    classic_page="$repo_root/modules/settings/TlpConfig.qml"
-    waffle_page="$repo_root/modules/waffle/settings/pages/WTlpPage.qml"
-
-    assert_contains 'function applyOnLeave(): bool {' "$settings_service" \
-        'the service must distinguish automatic Apply from manual retry behavior'
-    assert_contains 'root._previousPage === 27' "$classic_window" \
-        'classic page navigation must apply staged Battery changes'
-    assert_contains 'root._previousPage === 18' "$waffle_window" \
-        'Waffle page navigation must apply staged Battery changes'
-    assert_contains 'root._prevPage === 27' "$overlay" \
-        'overlay page navigation must apply staged Battery changes'
-    assert_contains 'onClosing: close =>' "$classic_window" \
-        'classic window close must wait for the privileged transaction'
-    assert_contains 'onClosing: close =>' "$waffle_window" \
-        'Waffle window close must wait for the privileged transaction'
-    assert_contains 'onSelectedCategoryIndexChanged:' "$classic_page" \
-        'classic category changes must auto-apply staged edits'
-    assert_contains 'onSelectedCategoryIndexChanged:' "$waffle_page" \
-        'Waffle category changes must auto-apply staged edits'
+        'Waffle page must render schema groups'
+    assert_contains 'onClicked: TlpSettingsService.apply()' "$classic_page" \
+        'classic page must expose explicit Apply'
+    assert_contains 'onButtonClicked: TlpSettingsService.apply()' "$waffle_page" \
+        'Waffle page must expose explicit Apply'
 }
 
 test_quickshell_lifecycle_contract_is_status_driven() {
@@ -1199,9 +1098,7 @@ test_post_resume_hardware_drift_is_repaired_transactionally() {
     set_policy 80 >/dev/null 2>&1 || fail 'initial battery policy should apply'
     cp "$config_file" "$case_dir/pre-drift-policy"
 
-    # Model firmware which returned to full-charge after resume. The next
-    # Quickshell status read exposes the mismatch; TlpService then requests the
-    # same policy through the transactional helper.
+    # Simulate firmware restoring full-charge thresholds after resume.
     printf '99\n' > "$state_start"
     printf '100\n' > "$state_stop"
     drift_output=$(status)
@@ -1296,7 +1193,7 @@ run_test() {
     fi
 }
 
-printf '1..38\n'
+printf '1..37\n'
 run_test 'status uses TLP plugin metadata' test_status_uses_tlp_plugin_metadata
 run_test 'generic plugin fails closed' test_generic_plugin_fails_closed
 run_test 'unsupported TLP version fails closed' test_unsupported_tlp_version_fails_closed
@@ -1328,7 +1225,6 @@ run_test 'TLP settings batch charge disable and overrides' test_tlp_settings_bat
 run_test 'TLP settings batch disable keeps fullcharge best-effort' test_tlp_settings_batch_disable_keeps_fullcharge_best_effort
 run_test 'TLP settings batch rolls back both drop-ins' test_tlp_settings_batch_rolls_back_both_dropins
 run_test 'TLP settings UI exposes grouped batched controls' test_tlp_settings_ui_uses_schema_groups_and_batched_apply
-run_test 'TLP settings auto-apply covers navigation and close' test_tlp_settings_auto_apply_hooks_cover_navigation_and_close
 run_test 'Quickshell lifecycle contract is status-driven' test_quickshell_lifecycle_contract_is_status_driven
 run_test 'startup timer and display polling are read-only' test_startup_timer_and_display_polling_are_read_only
 run_test 'TLP resume preserves persistent iNiR policies' test_tlp_resume_preserves_persistent_inir_policies

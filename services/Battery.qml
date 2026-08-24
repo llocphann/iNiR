@@ -12,13 +12,14 @@ Singleton {
     id: root
 
     function _log(...args): void {
-        if (Quickshell.env("QS_DEBUG") === "1") console.log(...args)
+        if (Quickshell.env("QS_DEBUG") === "1") console.log(...args);
     }
 
     property bool available: UPower.displayDevice.isLaptopBattery
     property var chargeState: UPower.displayDevice.state
     property bool isCharging: chargeState == UPowerDeviceState.Charging
     property bool isPluggedIn: isCharging || chargeState == UPowerDeviceState.PendingCharge
+    // Discharging-based, not !isPluggedIn: FullyCharged on AC must not count as "on battery"
     readonly property bool onBattery: available && (chargeState == UPowerDeviceState.Discharging || chargeState == UPowerDeviceState.PendingDischarge)
     property real percentage: UPower.displayDevice?.percentage ?? 1
     readonly property bool allowAutomaticSuspend: Config.options?.battery?.automaticSuspend ?? false
@@ -66,53 +67,58 @@ Singleton {
 
     // ─── Battery warnings ───
     onIsLowAndNotChargingChanged: {
-        if (!root.available || !isLowAndNotCharging) return
+        if (!root.available || !isLowAndNotCharging) return;
         Quickshell.execDetached([
-            "/usr/bin/notify-send",
-            Translation.tr("Low battery"),
-            Translation.tr("Consider plugging in your device"),
+            "/usr/bin/notify-send", 
+            Translation.tr("Low battery"), 
+            Translation.tr("Consider plugging in your device"), 
             "-u", "critical",
             "-a", "Shell",
             "--hint=int:transient:1",
         ])
-        if (root.soundEnabled) Audio.playEvent("batteryLow")
+
+        if (root.soundEnabled) Audio.playEvent("batteryLow");
     }
 
     onIsCriticalAndNotChargingChanged: {
-        if (!root.available || !isCriticalAndNotCharging) return
+        if (!root.available || !isCriticalAndNotCharging) return;
         Quickshell.execDetached([
-            "/usr/bin/notify-send",
-            Translation.tr("Critically low battery"),
-            Translation.tr("Please charge!\nAutomatic suspend triggers at %1%").arg(Config.options?.battery?.suspend ?? 5),
+            "/usr/bin/notify-send", 
+            Translation.tr("Critically low battery"), 
+            Translation.tr("Please charge!\nAutomatic suspend triggers at %1%").arg(Config.options?.battery?.suspend ?? 5), 
             "-u", "critical",
             "-a", "Shell",
             "--hint=int:transient:1",
-        ])
-        if (root.soundEnabled) Audio.playEvent("batteryCritical")
+        ]);
+
+        if (root.soundEnabled) Audio.playEvent("batteryCritical");
     }
 
     onIsSuspendingAndNotChargingChanged: {
-        if (root.available && isSuspendingAndNotCharging)
+        if (root.available && isSuspendingAndNotCharging) {
             Session.suspend()
+        }
     }
 
     onIsFullAndChargingChanged: {
-        if (!root.available || !isFullAndCharging) return
+        if (!root.available || !isFullAndCharging) return;
         Quickshell.execDetached([
             "/usr/bin/notify-send",
             Translation.tr("Battery full"),
             Translation.tr("Please unplug the charger"),
             "-a", "Shell",
             "--hint=int:transient:1",
-        ])
-        if (root.soundEnabled) Audio.playEvent("batteryFull")
+        ]);
+
+        if (root.soundEnabled) Audio.playEvent("batteryFull");
     }
 
     onIsPluggedInChanged: {
-        if (!root.available || !root.soundEnabled) return
-        if (isPluggedIn)
+        if (!root.available || !root.soundEnabled) return;
+        if (isPluggedIn) {
             Audio.playEvent("powerPlug")
-        else
+        } else {
             Audio.playEvent("powerUnplug")
+        }
     }
 }

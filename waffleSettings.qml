@@ -121,8 +121,6 @@ ApplicationWindow {
     ]
     
     property int currentPage: 0
-    property int _previousPage: 0
-    property bool _quitAfterTlpMutation: false
     property int _requestedStartPage: -1
     property bool _navigationInitialized: false
 
@@ -142,30 +140,10 @@ ApplicationWindow {
         root.tryOpenPendingSection()
     }
 
-    onCurrentPageChanged: {
-        if (root._navigationInitialized
-                && root._previousPage === 18
-                && root.currentPage !== 18
-                && TlpSettingsService.hasPendingChanges)
-            TlpSettingsService.applyOnLeave()
-        root._previousPage = root.currentPage
-        root._persistCurrentPage()
-    }
+    onCurrentPageChanged: root._persistCurrentPage()
     
     visible: true
-    onClosing: close => {
-        if (root._quitAfterTlpMutation) {
-            close.accepted = false
-            return
-        }
-        if (TlpSettingsService.busy || TlpSettingsService.hasPendingChanges) {
-            close.accepted = false
-            root._quitAfterTlpMutation = true
-            TlpSettingsService.applyOnLeave()
-            return
-        }
-        Qt.quit()
-    }
+    onClosing: Qt.quit()
     title: "Settings — iNiR"
 
     function tryOpenPendingSection(): void {
@@ -198,19 +176,6 @@ ApplicationWindow {
     Connections {
         target: Persistent
         function onReadyChanged() { root.initializeNavigation() }
-    }
-
-    Connections {
-        target: TlpSettingsService
-
-        function onMutationFinished(kind, success): void {
-            if (!root._quitAfterTlpMutation)
-                return
-            if (!success && TlpSettingsService.hasPendingChanges)
-                TlpSettingsService.discard()
-            root._quitAfterTlpMutation = false
-            Qt.quit()
-        }
     }
     
     Connections {

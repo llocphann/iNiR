@@ -1,7 +1,5 @@
-# Migration: Install the privileged TLP helper, schema and polkit action
-# The helper is deliberately installed outside the user-writable Quickshell runtime.
-# QML invokes it through pkexec; all privileged writes are constrained to iNiR's
-# own TLP drop-in and are validated/applied by TLP.
+# Install the root-owned TLP helper, schema and polkit action outside the
+# user-writable Quickshell runtime; privileged writes stay helper-controlled.
 
 MIGRATION_ID="037-battery-charge-limit-helper"
 MIGRATION_TITLE="Install iNiR TLP settings backend"

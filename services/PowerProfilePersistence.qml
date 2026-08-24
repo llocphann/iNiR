@@ -38,10 +38,7 @@ Singleton {
 
         root._initialized = true
 
-        // When tlp-pd is enabled it owns profile selection, including AC/BAT
-        // automatic switching. Restoring iNiR's last observed profile here
-        // would turn an automatically selected TLP profile into a forced one
-        // on the next shell start.
+        // tlp-pd owns automatic profile selection; don't overwrite it with persisted state.
         if (root._tlpPdManaged)
             return
 
@@ -76,8 +73,7 @@ Singleton {
         }
     }
 
-    // Covers the path where Config was already ready before this singleton was
-    // instantiated (hot-reload or deferred loading after Config.ready fired).
+    // Also probe when this singleton loads after Config is already ready.
     Component.onCompleted: {
         if (Config.ready)
             root._probeTlpPd()
@@ -94,9 +90,7 @@ Singleton {
         }
     }
 
-    // Migrations, package updates, or manual service changes can enable/disable
-    // tlp-pd while the shell stays alive. Re-probe read-only state so profile
-    // persistence never keeps acting on a stale startup decision.
+    // Re-probe if package, migration, or service state changes at runtime.
     Timer {
         interval: 30000
         repeat: true
@@ -107,8 +101,7 @@ Singleton {
     Connections {
         target: PowerProfiles
         function onProfileChanged(): void {
-            // TLP/tlp-pd owns this state when enabled; do not persist its
-            // automatically selected AC/BAT profile as iNiR's user preference.
+            // Don't persist tlp-pd's automatic AC/BAT selection as a user preference.
             if (root._tlpPdManaged)
                 return
 

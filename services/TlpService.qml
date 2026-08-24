@@ -31,9 +31,7 @@ Singleton {
     property int managedLimit: -1
     property bool busy: false
 
-    // Nested JsonAdapter assignments do not emit reliable per-property change
-    // notifications. Depend on Config.revision explicitly so a settings-window
-    // write is observed by this process immediately (including disable).
+    // Config.revision makes nested JsonAdapter writes observable here.
     readonly property int requestedLimit: {
         void Config.revision
         return Config.options?.battery?.chargeLimit?.threshold ?? 80
@@ -166,8 +164,7 @@ Singleton {
     }
 
     function _matchesRequestedPolicy(): bool {
-        // Disabled means iNiR must stop owning a TLP drop-in. A charge limit
-        // from the user's own TLP configuration may legitimately remain active.
+        // Disabled requires only iNiR ownership to be absent; user TLP limits may remain.
         if (!root.enabled)
             return !root.managed
 
@@ -186,8 +183,7 @@ Singleton {
         if (!Config.ready)
             return
 
-        // Preserve the latest requested config change while a privileged apply
-        // or status refresh is already in flight. One reconciliation runs later.
+        // Coalesce config changes while status or apply is in flight.
         if (root.busy || detector.running) {
             root._reconcileAfterDetect = true
             return
@@ -199,8 +195,7 @@ Singleton {
             return
         }
 
-        // Enabling requires a battery-care interface. Disabling only requires
-        // iNiR to own a drop-in, even if the battery was removed in the meantime.
+        // Enabling needs hardware support; disabling only needs owned state to remove.
         if (root.enabled && !root.supported) {
             root._reconcileAfterDetect = false
             return
@@ -227,8 +222,7 @@ Singleton {
         target: Config
 
         function onConfigChanged(): void {
-            // Let revision-dependent bindings settle before comparing the
-            // requested policy with the last hardware status.
+            // Let revision-dependent bindings settle before comparing state.
             Qt.callLater(() => root.apply())
         }
 
@@ -285,8 +279,7 @@ Singleton {
             else
                 root._log("[TLP] Battery charge policy applied")
 
-            // Always refresh from the non-privileged status path. If config
-            // changed while pkexec was active, keep the pending reconciliation.
+            // Re-read status after mutation; preserve any queued reconciliation.
             root._detect()
         }
     }
