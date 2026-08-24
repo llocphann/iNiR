@@ -184,6 +184,8 @@ RUNTIME_EXCLUDES=(
   --exclude='/release.sh' --exclude='/wiki-sync.sh' --exclude='/verify-docs.sh'
   --exclude='/qml-check.fish' --exclude='/test-local-distribution.sh'
   --exclude='/test-mascot-pack-flow.sh'
+  --exclude='/test-battery-charge-limit-helper.sh'
+  --exclude='/test-tlp-integration-lifecycle.sh'
   # Local art work files — the manifest always ships, the art does not
   --exclude='graphify-out/'
   --exclude='images/mascot/*.png' --exclude='images/mascot/*.gif'

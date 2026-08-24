@@ -307,6 +307,39 @@ uninstall_reload_user_systemd() {
     fi
 }
 
+uninstall_remove_battery_charge_limit() {
+    local helper="/usr/libexec/inir-battery-charge-limit"
+    local policy="/usr/share/polkit-1/actions/org.inir.battery-charge-limit.policy"
+    local schema="/usr/share/inir/tlp-settings-schema.json"
+    local battery_dropin="/etc/tlp.d/99-inir-battery-charge-limit.conf"
+    local settings_dropin="/etc/tlp.d/99-inir-tlp-settings.conf"
+
+    if [[ ! -e "$helper" && ! -e "$policy" && ! -e "$schema" \
+        && ! -e "$battery_dropin" && ! -e "$settings_dropin" ]]; then
+        return 0
+    fi
+
+    tui_info "Removing iNiR TLP settings integration..."
+
+    # The helper removes only iNiR-owned drop-ins. User and distribution TLP
+    # files remain untouched. Cleanup still proceeds if TLP disappeared.
+    if [[ -x "$helper" ]]; then
+        if ! pkg_sudo "$helper" --config-reset; then
+            tui_warn "Could not fully re-apply TLP; removing the iNiR-owned settings drop-in directly."
+            pkg_sudo rm -f "$settings_dropin" || return 1
+        fi
+        if ! pkg_sudo "$helper" --disable; then
+            tui_warn "Could not fully re-apply TLP; removing the iNiR-owned drop-in directly."
+            pkg_sudo rm -f "$battery_dropin" || return 1
+        fi
+    else
+        pkg_sudo rm -f "$settings_dropin" "$battery_dropin" || return 1
+    fi
+
+    pkg_sudo rm -f "$helper" "$policy" "$schema" || return 1
+    tui_success "iNiR TLP settings integration removed (TLP preserved)"
+}
+
 uninstall_create_backup() {
     local backup_dir="${HOME}/.local/share/inir-uninstall-backup-$(date +%Y%m%d-%H%M%S)"
 
@@ -912,6 +945,13 @@ run_uninstall() {
     # Stop services
     uninstall_stop_services
 
+    # Remove privileged artifacts before deleting the user runtime which owns
+    # the corresponding UI. TLP itself and user-owned TLP files are preserved.
+    if ! uninstall_remove_battery_charge_limit; then
+        tui_error "Battery charge-limit cleanup failed; no user files were removed."
+        return 1
+    fi
+
     # Remove iNiR-exclusive files (always safe)
     uninstall_remove_inir_only
     uninstall_reload_user_systemd
@@ -988,6 +1028,12 @@ run_uninstall_quick() {
 
     # Stop services
     uninstall_stop_services
+
+    # The helper, policy and managed TLP drop-in are iNiR-exclusive.
+    if ! uninstall_remove_battery_charge_limit; then
+        tui_error "Battery charge-limit cleanup failed; no user files were removed."
+        return 1
+    fi
 
     # Remove only iNiR-exclusive files
     ask=false  # Disable prompts for shared configs

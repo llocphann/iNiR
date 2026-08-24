@@ -6,8 +6,17 @@ ICON_DIR = $(SHAREDIR)/icons/hicolor/scalable/apps
 SHELL_INSTALL_DIR = $(SHAREDIR)/quickshell/inir
 DOC_DIR = $(SHAREDIR)/doc/inir-shell
 SYSTEMD_USER_DIR ?= $(PREFIX)/lib/systemd/user
+LIBEXECDIR ?= /usr/libexec
+POLKIT_ACTIONS_DIR ?= /usr/share/polkit-1/actions
+TLP_CONFDIR ?= /etc/tlp.d
+INIR_SYSTEM_SHAREDIR ?= /usr/share/inir
+BATTERY_HELPER = $(LIBEXECDIR)/inir-battery-charge-limit
+BATTERY_POLICY = $(POLKIT_ACTIONS_DIR)/org.inir.battery-charge-limit.policy
+BATTERY_DROPIN = $(TLP_CONFDIR)/99-inir-battery-charge-limit.conf
+TLP_SETTINGS_DROPIN = $(TLP_CONFDIR)/99-inir-tlp-settings.conf
+TLP_SETTINGS_SCHEMA = $(INIR_SYSTEM_SHAREDIR)/tlp-settings-schema.json
 
-.PHONY: all build test-local install install-bin install-shell install-systemd install-icon install-desktop install-docs uninstall uninstall-bin uninstall-shell uninstall-systemd uninstall-icon uninstall-desktop uninstall-docs
+.PHONY: all build test-local test-battery-helper install install-bin install-shell install-systemd install-icon install-desktop install-docs install-battery-helper uninstall uninstall-bin uninstall-shell uninstall-systemd uninstall-icon uninstall-desktop uninstall-docs uninstall-battery-helper
 
 all: build
 
@@ -19,6 +28,9 @@ build:
 
 test-local: build
 	@bash scripts/test-local-distribution.sh
+
+test-battery-helper:
+	@sh scripts/test-battery-charge-limit-helper.sh
 
 install-bin:
 	@install -Dm755 scripts/inir $(BINDIR)/inir
@@ -47,7 +59,7 @@ install-shell:
 	@rm -rf $(SHELL_INSTALL_DIR)/assets/images/mascot/frames
 	@# Strip maintainer and development tooling — useless on a user's machine
 	@rm -rf $(SHELL_INSTALL_DIR)/scripts/agents $(SHELL_INSTALL_DIR)/translations/tools $(SHELL_INSTALL_DIR)/translations/l10n
-	@rm -f $(SHELL_INSTALL_DIR)/scripts/release.sh $(SHELL_INSTALL_DIR)/scripts/wiki-sync.sh $(SHELL_INSTALL_DIR)/scripts/verify-docs.sh $(SHELL_INSTALL_DIR)/scripts/qml-check.fish $(SHELL_INSTALL_DIR)/scripts/test-local-distribution.sh $(SHELL_INSTALL_DIR)/scripts/test-mascot-pack-flow.sh
+	@rm -f $(SHELL_INSTALL_DIR)/scripts/release.sh $(SHELL_INSTALL_DIR)/scripts/wiki-sync.sh $(SHELL_INSTALL_DIR)/scripts/verify-docs.sh $(SHELL_INSTALL_DIR)/scripts/qml-check.fish $(SHELL_INSTALL_DIR)/scripts/test-local-distribution.sh $(SHELL_INSTALL_DIR)/scripts/test-mascot-pack-flow.sh $(SHELL_INSTALL_DIR)/scripts/test-battery-charge-limit-helper.sh $(SHELL_INSTALL_DIR)/scripts/test-tlp-integration-lifecycle.sh
 	@find $(SHELL_INSTALL_DIR)/scripts -type f \( -name "*.sh" -o -name "*.fish" -o -name "*.py" \) -exec chmod +x {} +
 	@printf '{\n  "version": "%s",\n  "commit": "manual",\n  "installed_at": "%s",\n  "installedAt": "%s",\n  "source": "make-install",\n  "repo_path": "",\n  "repoPath": "",\n  "install_mode": "package-managed",\n  "installMode": "package-managed",\n  "update_strategy": "package-manager",\n  "updateStrategy": "package-manager",\n  "package_manager": "manual",\n  "packageManager": "manual",\n  "package_name": "source-install",\n  "packageName": "source-install",\n  "package_update_hint": "sudo make install",\n  "packageUpdateHint": "sudo make install"\n}\n' "$$(cat VERSION)" "$$(date -Iseconds)" "$$(date -Iseconds)" > $(SHELL_INSTALL_DIR)/version.json
 
@@ -72,7 +84,12 @@ install-docs:
 	@install -Dm644 docs/SETUP.md $(DOC_DIR)/SETUP.md
 	@install -Dm644 docs/IPC.md $(DOC_DIR)/IPC.md
 
-install: build install-bin install-shell install-systemd install-icon install-desktop install-docs
+install-battery-helper:
+	@install -Dm755 assets/helpers/inir-battery-charge-limit "$(DESTDIR)$(BATTERY_HELPER)"
+	@install -Dm644 assets/polkit/org.inir.battery-charge-limit.policy "$(DESTDIR)$(BATTERY_POLICY)"
+	@install -Dm644 assets/tlp/tlp-settings-schema.json "$(DESTDIR)$(TLP_SETTINGS_SCHEMA)"
+
+install: build install-bin install-shell install-systemd install-icon install-desktop install-docs install-battery-helper
 
 uninstall-bin:
 	@rm -f $(BINDIR)/inir
@@ -94,4 +111,13 @@ uninstall-desktop:
 uninstall-docs:
 	@rm -rf $(DOC_DIR)
 
-uninstall: uninstall-systemd uninstall-desktop uninstall-icon uninstall-docs uninstall-shell uninstall-bin
+uninstall-battery-helper:
+	@if [ -z "$(DESTDIR)" ] && [ -x "$(BATTERY_HELPER)" ]; then \
+		"$(BATTERY_HELPER)" --config-reset >/dev/null 2>&1 || true; \
+		"$(BATTERY_HELPER)" --disable >/dev/null 2>&1 || true; \
+	fi
+	@rm -f "$(DESTDIR)$(BATTERY_DROPIN)"
+	@rm -f "$(DESTDIR)$(TLP_SETTINGS_DROPIN)"
+	@rm -f "$(DESTDIR)$(BATTERY_HELPER)" "$(DESTDIR)$(BATTERY_POLICY)" "$(DESTDIR)$(TLP_SETTINGS_SCHEMA)"
+
+uninstall: uninstall-systemd uninstall-desktop uninstall-icon uninstall-docs uninstall-shell uninstall-bin uninstall-battery-helper

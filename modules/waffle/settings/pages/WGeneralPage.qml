@@ -79,40 +79,6 @@ WSettingsPage {
             checked: Config.options?.battery?.notifyFull ?? true
             onCheckedChanged: Config.setNestedValue("battery.notifyFull", checked)
         }
-
-        WSettingsSwitch {
-            property bool _ready: false
-            label: Translation.tr("Charge limit")
-            icon: "battery-saver"
-            description: !Battery.chargeLimitSupported
-                ? Translation.tr("Not supported on this device")
-                : Battery.chargeLimitAdjustable
-                    ? Translation.tr("Limit maximum charge to preserve battery health")
-                    : Translation.tr("Use your device's built-in battery conservation mode (requires polkit)")
-            enabled: Battery.chargeLimitSupported
-            checked: Config.options?.battery?.chargeLimit?.enable ?? false
-            Component.onCompleted: _ready = true
-            onCheckedChanged: {
-                if (_ready && checked !== (Config.options?.battery?.chargeLimit?.enable ?? false))
-                    Config.setNestedValue("battery.chargeLimit.enable", checked)
-            }
-        }
-
-        WSettingsSpinBox {
-            property bool _ready: false
-            visible: Battery.chargeLimitAdjustable
-            enabled: Config.options?.battery?.chargeLimit?.enable ?? false
-            label: Translation.tr("Charge limit threshold")
-            icon: "battery-saver"
-            suffix: "%"
-            from: 20; to: 100; stepSize: 5
-            value: Config.options?.battery?.chargeLimit?.threshold ?? 80
-            Component.onCompleted: _ready = true
-            onValueChanged: {
-                if (_ready && value !== (Config.options?.battery?.chargeLimit?.threshold ?? 80))
-                    Config.setNestedValue("battery.chargeLimit.threshold", value)
-            }
-        }
     }
     
     WSettingsCard {

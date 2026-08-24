@@ -45,6 +45,9 @@ singleton Notifications 1.0 Notifications.qml
 singleton PolkitService 1.0 PolkitService.qml
 PolkitServiceImpl 1.0 PolkitServiceImpl.qml
 singleton PowerProfilePersistence 1.0 PowerProfilePersistence.qml
+singleton TlpRuntimeCapabilities 1.0 TlpRuntimeCapabilities.qml
+singleton TlpService 1.0 TlpService.qml
+singleton TlpSettingsService 1.0 TlpSettingsService.qml
 singleton Privacy 1.0 Privacy.qml
 singleton RecorderStatus 1.0 RecorderStatus.qml
 singleton ResourceUsage 1.0 ResourceUsage.qml

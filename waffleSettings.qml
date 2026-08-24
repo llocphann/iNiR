@@ -112,6 +112,11 @@ ApplicationWindow {
             name: Translation.tr("Shell Layout"),
             icon: "desktop",
             component: Qt.resolvedUrl("modules/waffle/settings/pages/WShellLayoutPage.qml")
+        },
+        {
+            name: Translation.tr("Battery"),
+            icon: "battery-saver",
+            component: Qt.resolvedUrl("modules/waffle/settings/pages/WTlpPage.qml")
         }
     ]
     
