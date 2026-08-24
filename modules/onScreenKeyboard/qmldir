@@ -2,3 +2,4 @@ module qs.modules.onScreenKeyboard
 OnScreenKeyboard 1.0 OnScreenKeyboard.qml
 OskContent 1.0 OskContent.qml
 OskKey 1.0 OskKey.qml
+singleton PhysicalKeyboardFeedback 1.0 PhysicalKeyboardFeedback.qml

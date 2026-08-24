@@ -13,6 +13,10 @@ RippleButton {
     property string type: keyData.keytype
     property var keycode: keyData.keycode
     property string shape: keyData.shape
+    readonly property bool physicalPressed: keycode !== undefined
+        && keycode !== null
+        && PhysicalKeyboardFeedback.pressedKeycodes.includes(Number(keycode))
+    readonly property bool showPhysicalPress: physicalPressed && !root.down && !root.toggled
     property bool isShift: Ydotool.shiftKeys.includes(keycode)
     property bool isBackspace: (key.toLowerCase() == "backspace")
     property bool isEnter: (key.toLowerCase() == "enter" || key.toLowerCase() == "return")
@@ -37,11 +41,27 @@ RippleButton {
     toggled: isShift ? Ydotool.shiftMode : false
 
     enabled: shape != "empty"
+    // Physical key events are visual-only. Do not call Ydotool here: the real
+    // keyboard event is already being delivered to the focused application.
+    // Suppress this extra transform while the pointer is down (or a virtual
+    // modifier is toggled) so ydotool-generated events do not double-animate.
+    scale: showPhysicalPress ? 0.96 : 1
+    Behavior on scale {
+        enabled: Appearance.animationsEnabled
+        NumberAnimation {
+            duration: Appearance.animation.elementMoveFast.duration
+            easing.type: Appearance.animation.elementMoveFast.type
+            easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve
+        }
+    }
+
     // ZZZ: raised carbon keycaps (bg2) over the bg0 backplate, with the active
     // mod key reading as a signal sticker. Other styles keep the flat layer1.
     colBackground: shape == "empty"
         ? ColorUtils.transparentize(Appearance.colors.colLayer1)
-        : (Appearance.zzzEverywhere ? Appearance.zzz.bg2 : Appearance.colors.colLayer1)
+        : showPhysicalPress
+            ? Appearance.colLayer1Active
+            : (Appearance.zzzEverywhere ? Appearance.zzz.bg2 : Appearance.colors.colLayer1)
     colBackgroundToggled: Appearance.zzzEverywhere ? Appearance.zzz.sticker : Appearance.colors.colPrimary
     buttonRadius: Appearance.zzzEverywhere ? Appearance.zzz.controlRadius : Appearance.rounding.small
     implicitWidth: baseWidth * widthMultiplier[shape] || baseWidth
