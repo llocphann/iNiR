@@ -22,7 +22,7 @@ Item {
 
     visible: SystemTray.items.values.length > 0
     implicitWidth: visible ? row.implicitWidth : 0
-    implicitHeight: 24 * tray.s
+    implicitHeight: 30 * tray.s
 
     /** Raised for the shell to open this item's native menu at the given x. */
     signal menuRequested(var item, real anchorX)
@@ -50,12 +50,12 @@ Item {
 
                 required property var modelData
 
-                Layout.preferredWidth: 24 * tray.s
-                Layout.preferredHeight: 24 * tray.s
+                Layout.preferredWidth: 30 * tray.s
+                Layout.preferredHeight: 30 * tray.s
 
                 Rectangle {
                     anchors.fill: parent
-                    radius: 6 * tray.s
+                    radius: 8 * tray.s
                     color: PillTheme.frameBg
                     border.width: 1
                     border.color: PillTheme.frameBorder
@@ -68,8 +68,8 @@ Item {
                     source: slot.modelData.icon
                     sourceSize.width: 32
                     sourceSize.height: 32
-                    width: 16 * tray.s
-                    height: 16 * tray.s
+                    width: 19 * tray.s
+                    height: 19 * tray.s
                     fillMode: Image.PreserveAspectFit
                     smooth: true
                     cache: true

@@ -29,11 +29,16 @@ Item { // Notification item area
     property var dragIndexDiff: Math.abs(parentDragIndex - index)
     property real xOffset: dragIndexDiff == 0 ? parentDragDistance : 0
 
-    readonly property bool notificationCritical:
-        root.notificationObject?.urgency === NotificationUrgency.Critical
-        || String(root.notificationObject?.urgency ?? "").toLowerCase() === "critical"
+    readonly property bool notificationCritical: {
+        const value = root.notificationObject?.urgency
+        if (value === undefined || value === null)
+            return false
+        return value === NotificationUrgency.Critical
+            || String(value).toLowerCase() === "critical"
+    }
 
     readonly property string notificationSummaryText: String(root.notificationObject?.summary ?? "")
+    readonly property bool hasNotificationActions: (root.notificationObject?.actions?.length ?? 0) > 0
     readonly property string processedNotificationBodyText: {
         if (!root.notificationObject) return ""
         const body = String(root.notificationObject.body ?? "")
@@ -324,7 +329,7 @@ Item { // Notification item area
                                 Layout.fillWidth: true
                                 buttonText: Translation.tr("Close")
                                 urgency: root.notificationObject?.urgency ?? NotificationUrgency.Normal
-                                implicitWidth: (!notificationObject?.actions || notificationObject.actions.length == 0) ? ((actionsFlickable.width - actionRowLayout.spacing) / 2) :
+                                implicitWidth: !root.hasNotificationActions ? (Math.max(0, actionsFlickable.width - actionRowLayout.spacing) / 2) :
                                     ((contentItem?.implicitWidth ?? 0) + (leftPadding ?? 0) + (rightPadding ?? 0))
 
                                 onClicked: {
@@ -358,7 +363,7 @@ Item { // Notification item area
                             NotificationActionButton {
                                 Layout.fillWidth: true
                                 urgency: root.notificationObject?.urgency ?? NotificationUrgency.Normal
-                                implicitWidth: (!notificationObject?.actions || notificationObject.actions.length == 0) ? ((actionsFlickable.width - actionRowLayout.spacing) / 2) :
+                                implicitWidth: !root.hasNotificationActions ? (Math.max(0, actionsFlickable.width - actionRowLayout.spacing) / 2) :
                                     ((contentItem?.implicitWidth ?? 0) + (leftPadding ?? 0) + (rightPadding ?? 0))
 
                                 onClicked: {

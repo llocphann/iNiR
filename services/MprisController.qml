@@ -115,7 +115,8 @@ Singleton {
 						appId: props["application.id"] ?? "",
 						binary: props["application.process.binary"] ?? "",
 						nodeName: props["node.name"] ?? "",
-						mediaName: props["media.name"] ?? ""
+						mediaName: props["media.name"] ?? "",
+						state: item?.info?.state ?? ""
 					}
 				}
 				root._streamMetadataById = next
@@ -639,24 +640,43 @@ Singleton {
 		return (player?.canGoNext ?? false) || root._canUseBrowserNavigationFallback(player);
 	}
 
-	function previousForPlayer(player): void {
-		if (_isYtMusicMpv(player) && YtMusic.currentVideoId && YtMusic.canGoPrevious) {
-			YtMusic.playPrevious();
-		} else if (player?.canGoPrevious ?? false) {
-			player.previous();
-		} else if (root._canUseBrowserNavigationFallback(player)) {
-			root._navigateBrowserYoutube(player, "previous");
-		}
+	function _showUserMediaAction(action: string): void {
+		if (Config.options?.osd?.mediaEnabled ?? true)
+			GlobalStates.showMediaAction(action);
 	}
 
-	function nextForPlayer(player): void {
+	function previousForPlayer(player, showFeedback = true): bool {
+		let accepted = false;
+		if (_isYtMusicMpv(player) && YtMusic.currentVideoId && YtMusic.canGoPrevious) {
+			YtMusic.playPrevious();
+			accepted = true;
+		} else if (player?.canGoPrevious ?? false) {
+			player.previous();
+			accepted = true;
+		} else if (root._canUseBrowserNavigationFallback(player)) {
+			root._navigateBrowserYoutube(player, "previous");
+			accepted = true;
+		}
+		if (accepted && showFeedback)
+			root._showUserMediaAction("previous");
+		return accepted;
+	}
+
+	function nextForPlayer(player, showFeedback = true): bool {
+		let accepted = false;
 		if (_isYtMusicMpv(player) && YtMusic.currentVideoId && YtMusic.canGoNext) {
 			YtMusic.playNext();
+			accepted = true;
 		} else if (player?.canGoNext ?? false) {
 			player.next();
+			accepted = true;
 		} else if (root._canUseBrowserNavigationFallback(player)) {
 			root._navigateBrowserYoutube(player, "next");
+			accepted = true;
 		}
+		if (accepted && showFeedback)
+			root._showUserMediaAction("next");
+		return accepted;
 	}
 	
 	// Check if player is related to YtMusic (for duplicate filtering)
@@ -868,27 +888,37 @@ Singleton {
 	property bool canGoPrevious: (root.isYtMusicActive && YtMusic.currentVideoId)
 		? YtMusic.canGoPrevious
 		: root.canGoPreviousForPlayer(this.activePlayer);
-	function previous(): void {
+	function previous(): bool {
+		let accepted = false;
 		if (root.isYtMusicActive && YtMusic.currentVideoId && YtMusic.canGoPrevious) {
 			this.__reverse = true;
 			YtMusic.playPrevious();
+			accepted = true;
 		} else if (root.canGoPreviousForPlayer(this.activePlayer)) {
 			this.__reverse = true;
-			root.previousForPlayer(this.activePlayer);
+			accepted = root.previousForPlayer(this.activePlayer, false);
 		}
+		if (accepted)
+			root._showUserMediaAction("previous");
+		return accepted;
 	}
 
 	property bool canGoNext: (root.isYtMusicActive && YtMusic.currentVideoId)
 		? YtMusic.canGoNext
 		: root.canGoNextForPlayer(this.activePlayer);
-	function next(): void {
+	function next(): bool {
+		let accepted = false;
 		if (root.isYtMusicActive && YtMusic.currentVideoId && YtMusic.canGoNext) {
 			this.__reverse = false;
 			YtMusic.playNext();
+			accepted = true;
 		} else if (root.canGoNextForPlayer(this.activePlayer)) {
 			this.__reverse = false;
-			root.nextForPlayer(this.activePlayer);
+			accepted = root.nextForPlayer(this.activePlayer, false);
 		}
+		if (accepted)
+			root._showUserMediaAction("next");
+		return accepted;
 	}
 
 	function _volumeKey(value): string {
@@ -908,7 +938,7 @@ Singleton {
 		const title = String(player.trackTitle ?? "");
 		const titleKey = root._volumeKey(title);
 		const mediaKey = root._volumeKey(mediaName);
-		let score = 0;
+		let score = meta.state === "running" ? 20 : (meta.state === "idle" ? -20 : 0);
 		if (titleKey.length >= 4 && mediaKey.length >= 4) {
 			if (titleKey === mediaKey) score += 120;
 			else if (titleKey.includes(mediaKey) || mediaKey.includes(titleKey)) score += 80;
@@ -967,19 +997,169 @@ Singleton {
 		return bestScore >= 12 ? best : null;
 	}
 
+	function playerForStreamNode(node): MprisPlayer {
+		if (!node) return null;
+		let best = null;
+		let bestScore = 0;
+		for (const player of root.displayPlayers ?? []) {
+			const score = root._streamMatchScore(player, node);
+			if (score > bestScore) {
+				bestScore = score;
+				best = player;
+			}
+		}
+		return bestScore >= 12 ? best : null;
+	}
+
+	function _serviceNameFromUrl(value): string {
+		const match = String(value ?? "").trim().match(/^[a-z][a-z0-9+.-]*:\/\/([^\/:?#]+)/i);
+		if (!match?.[1]) return "";
+		const labels = match[1].toLowerCase().replace(/^www\./, "").split(".").filter(Boolean);
+		if (labels.length < 2) return "";
+		let stem = labels[labels.length - 2];
+		if (["co", "com", "net", "org"].includes(stem) && labels.length >= 3)
+			stem = labels[labels.length - 3];
+		return stem.split(/[-_]+/).filter(Boolean)
+			.map(part => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
+	}
+
+	function _cleanDisplayName(value): string {
+		return String(value ?? "").replace(/\s+/g, " ").trim()
+			.replace(/\s+\((?:v?\d)[^)]*\)\s*$/i, "");
+	}
+
+	function _genericBrowserName(value): bool {
+		const key = root._volumeKey(value);
+		return ["chromium", "googlechrome", "chrome", "firefox", "zen", "brave", "vivaldi", "opera", "librewolf", "floorp", "waterfox"].includes(key);
+	}
+
+	function _desktopEntryForHint(value): var {
+		const hint = root._cleanDisplayName(value);
+		if (!hint.length) return null;
+		const direct = AppSearch.lookupDesktopEntry(hint);
+		if (direct) return direct;
+		const hintKey = root._volumeKey(hint);
+		const hintTokens = root._volumeTokens(hint);
+		let best = null;
+		let bestScore = 0;
+		for (const entry of DesktopEntries.applications.values ?? []) {
+			if (!entry || entry.noDisplay) continue;
+			const command = Array.from(entry.command ?? []);
+			const values = [entry.id, entry.name, entry.genericName, entry.startupClass, command.length > 0 ? command[0] : ""];
+			let score = 0;
+			for (const candidate of values) {
+				const candidateKey = root._volumeKey(candidate);
+				if (!candidateKey) continue;
+				if (candidateKey === hintKey) score = Math.max(score, 100);
+				else if (hintKey.length >= 5 && candidateKey.length >= 5
+						&& (hintKey.includes(candidateKey) || candidateKey.includes(hintKey)))
+					score = Math.max(score, 60);
+				const candidateTokens = root._volumeTokens(candidate);
+				let overlap = 0;
+				for (const token of hintTokens) {
+					if (candidateTokens.includes(token)
+							|| candidateTokens.some(other => token.length >= 4 && other.length >= 4
+								&& (token.includes(other) || other.includes(token))))
+						overlap++;
+				}
+				score = Math.max(score, overlap * 18);
+			}
+			if (score > bestScore) {
+				bestScore = score;
+				best = entry;
+			}
+		}
+		return bestScore >= 36 ? best : null;
+	}
+
+	function playerDisplayName(player): string {
+		if (!player) return "";
+		if (root._isBrowserPlayer(player)) {
+			const service = root._serviceNameFromUrl(player.metadata?.["xesam:url"] ?? "");
+			if (service.length > 0) return service;
+		}
+		const entryId = String(player.desktopEntry ?? "").trim();
+		const entry = entryId.length > 0 ? root._desktopEntryForHint(entryId) : null;
+		if (entry?.name) return root._cleanDisplayName(entry.name);
+		const identity = root._cleanDisplayName(player.identity);
+		if (identity.length > 0) {
+			const identityEntry = root._desktopEntryForHint(identity);
+			if (identityEntry?.name) return root._cleanDisplayName(identityEntry.name);
+			return identity;
+		}
+		const tail = String(player.dbusName ?? "").replace(/^org\.mpris\.MediaPlayer2\./, "").split(".").pop() ?? "";
+		return tail.length > 0 ? tail.charAt(0).toUpperCase() + tail.slice(1) : "";
+	}
+
+	function streamDesktopEntry(node): var {
+		if (!node) return null;
+		const props = node.properties ?? {};
+		const binary = root._cleanDisplayName(props["application.process.binary"]);
+		if (binary.length > 0 && !root._genericBrowserName(binary)) {
+			const binaryEntry = root._desktopEntryForHint(binary);
+			if (binaryEntry) return binaryEntry;
+		}
+		const player = root.playerForStreamNode(node);
+		if (player) {
+			const playerHints = [player.desktopEntry, player.identity];
+			for (const hint of playerHints) {
+				const entry = root._desktopEntryForHint(hint);
+				if (entry) return entry;
+			}
+		}
+		const ids = [props["application.id"], binary, props["application.name"]];
+		for (const id of ids) {
+			const entry = root._desktopEntryForHint(id);
+			if (entry) return entry;
+		}
+		return null;
+	}
+
+	function streamDisplayName(node): string {
+		if (!node) return "";
+		const entry = root.streamDesktopEntry(node);
+		if (entry?.name) return root._cleanDisplayName(entry.name);
+		const player = root.playerForStreamNode(node);
+		if (player) {
+			const playerName = root.playerDisplayName(player);
+			if (playerName.length > 0 && !root._genericBrowserName(playerName)) return playerName;
+		}
+		const props = node.properties ?? {};
+		return root._cleanDisplayName(props["application.name"] || node.description || node.name || Translation.tr("Unknown"));
+	}
+
+	function streamIconName(node): string {
+		const entry = root.streamDesktopEntry(node);
+		if (entry?.icon) return String(entry.icon);
+		const props = node?.properties ?? {};
+		const hints = [props["application.icon-name"], props["application.id"], props["application.process.binary"], props["node.name"]];
+		for (const hint of hints) {
+			const icon = AppSearch.guessIcon(String(hint ?? ""));
+			if (AppSearch.iconExists(icon)) return icon;
+		}
+		return "application-x-executable";
+	}
+
+	function compactStreamDisplayName(node, maxChars: int): string {
+		const value = root.streamDisplayName(node);
+		const limit = Math.max(8, maxChars);
+		return value.length > limit ? value.slice(0, limit - 1).replace(/\s+$/, "") + "…" : value;
+	}
+
 	readonly property var activePlayerStreamNode: root.streamNodeForPlayer(root.activePlayer)
-	PwObjectTracker { objects: root.activePlayerStreamNode ? [root.activePlayerStreamNode] : [] }
 	readonly property real volume: {
 		if (root.isYtMusicActive && YtMusic.currentVideoId)
 			return YtMusic.getVolume();
+		if (root.activePlayer && root.activePlayer.volumeSupported && root.activePlayer.canControl)
+			return Math.max(0, Math.min(1, root.activePlayer.volume));
 		const nodeVolume = root.activePlayerStreamNode?.audio?.volume;
 		if (nodeVolume !== undefined && nodeVolume !== null)
 			return Math.max(0, Math.min(1, nodeVolume));
-		return Math.max(0, Math.min(1, root.activePlayer?.volume ?? 0));
+		return 0;
 	}
 	readonly property bool canChangeVolume: (root.isYtMusicActive && YtMusic.currentVideoId)
-		|| !!root.activePlayerStreamNode?.audio
-		|| !!(root.activePlayer && root.activePlayer.volumeSupported && root.activePlayer.canControl);
+		|| !!(root.activePlayer && root.activePlayer.volumeSupported && root.activePlayer.canControl)
+		|| !!root.activePlayerStreamNode?.audio;
 
 	function getVolume(): real {
 		return root.volume;
@@ -991,16 +1171,16 @@ Singleton {
 			YtMusic.setVolume(clamped);
 			return;
 		}
+		if (root.activePlayer && root.activePlayer.volumeSupported && root.activePlayer.canControl) {
+			root.activePlayer.volume = clamped;
+			return;
+		}
 		const node = root.activePlayerStreamNode;
 		if (node?.audio) {
-			node.audio.volume = clamped;
 			const nodeId = Number(node.id ?? 0);
 			if (Number.isFinite(nodeId) && nodeId > 0)
 				Quickshell.execDetached(["wpctl", "set-volume", String(nodeId), String(clamped)]);
-			return;
 		}
-		if (root.activePlayer && root.activePlayer.volumeSupported && root.activePlayer.canControl)
-			root.activePlayer.volume = clamped;
 	}
 
 	property bool loopSupported: this.activePlayer && this.activePlayer.loopSupported && this.activePlayer.canControl;
@@ -1091,15 +1271,9 @@ Singleton {
 		}
 		function previous(): void {
 			root.previous();
-			if (Config.options?.osd?.mediaEnabled ?? true) {
-				GlobalStates.showMediaAction("previous");
-			}
 		}
 		function next(): void {
 			root.next();
-			if (Config.options?.osd?.mediaEnabled ?? true) {
-				GlobalStates.showMediaAction("next");
-			}
 		}
 	}
 }

@@ -222,6 +222,7 @@
             "enableVSCode": true,
             "enableChrome": true,
             "enableSpicetify": false,
+            "spicetifyTheme": "Inir",
             "enableSteam": false,
             "enablePearDesktop": true,
             "enableNeovim": false,
@@ -810,7 +811,6 @@
         "pill": {
             "barMode": false,
             "scale": 1,
-            "opacity": 1,
             "topGap": 1,
             "appGap": 1,
             "showGlyphs": true,
@@ -838,9 +838,16 @@
                 "sidebars": true,
                 "power": true
             },
-            "rowSpacing": 20,
-            "iconSpacing": 12,
-            "iconSize": 17,
+            "rowSpacing": 24,
+            "iconSpacing": 14,
+            "iconSize": 19,
+            "batteryDisplay": "both",
+            "mediaAccess": "row",
+            "superSpaceLauncher": "overview",
+            "mixerAppRows": 5,
+            "restWidth": 176,
+            "restHeight": 44,
+            "expandedHeight": 66,
             "soul": {
                 "enable": true,
                 "size": 1,
@@ -864,7 +871,8 @@
                 "calendar": "",
                 "mixer": "",
                 "launcher": "",
-                "workspaces": ""
+                "workspaces": "",
+                "settings": ""
             }
         },
         "activeWindow": {

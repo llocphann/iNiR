@@ -13,6 +13,7 @@ Item {
     property bool expanded: true
     property bool collapsible: true
     property int animationDuration: Appearance.animation.elementMove.duration
+    property string settingsTaskSection: ""
     default property alias contentData: sectionContent.data
 
     property bool enableSettingsSearch: true

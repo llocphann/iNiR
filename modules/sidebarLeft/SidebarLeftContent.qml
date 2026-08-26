@@ -208,6 +208,19 @@ Item {
         visible: sidebarLeftBackground.angelEverywhere
             && !Appearance.gameModeMinimal
     }
+
+    IslandPanel {
+        anchors.fill: sidebarLeftBackground
+        visible: sidebarLeftBackground.islandStyle
+        radius: sidebarLeftBackground.radius
+        glassEnabled: true
+        screen: root.panelScreen ?? root.QsWindow?.window?.screen ?? null
+        glassScreenX: Appearance.sizes.hyprlandGapsOut
+        glassScreenY: Appearance.sizes.hyprlandGapsOut
+        glassScreenWidth: root.screenWidth
+        glassScreenHeight: root.screenHeight
+    }
+
     Rectangle {
         id: sidebarLeftBackground
 
@@ -323,20 +336,6 @@ Item {
                 height: sidebarLeftBackground.height
                 radius: sidebarLeftBackground.radius
             }
-        }
-
-        // Ricelin island face. Tonal separation replaces the redundant outer
-        // blur shadow; Angel keeps its signature stepped shadow above.
-        IslandPanel {
-            glassEnabled: true
-            glassScreenX: Appearance.sizes.hyprlandGapsOut
-            glassScreenY: Appearance.sizes.hyprlandGapsOut
-            glassScreenWidth: root.screenWidth ?? 1920
-            glassScreenHeight: root.screenHeight ?? 1080
-            anchors.fill: parent
-            visible: sidebarLeftBackground.islandStyle && !sidebarLeftBackground.gameModeMinimal
-            radius: sidebarLeftBackground.radius
-            shadow: false
         }
 
         Image {

@@ -33,6 +33,16 @@ Scope {
     property string openSurface: ""
     property var autoHideShownByScreen: ({})
 
+    function scaleForScreen(screen): real {
+        if (!screen)
+            return root.uiScale
+        const shortEdge = Math.min(screen.width, screen.height)
+        const resolutionScale = Math.max(0.78, Math.min(1.6, shortEdge / 1080))
+        const requested = resolutionScale * 1.1 * root.uiScale
+        const usabilityFloor = shortEdge >= 1000 ? 1.0 : shortEdge >= 800 ? 0.9 : 0.8
+        return Math.max(usabilityFloor, requested)
+    }
+
     function setAutoHideShown(screenName: string, shown: bool): void {
         if (!screenName || root.autoHideShownByScreen[screenName] === shown)
             return
@@ -52,9 +62,21 @@ Scope {
             if (GlobalStates.widgetEditMode)
                 root.close()
         }
+        function onPillSurfaceCommand(command: string, surface: string): void {
+            if (command === "open")
+                root.openSurfaceByName(surface)
+            else if (command === "close")
+                root.close()
+            else if (command === "toggle") {
+                if (root.openSurface === surface)
+                    root.close()
+                else
+                    root.openSurfaceByName(surface)
+            }
+        }
     }
 
-    readonly property var surfaceNames: ["power", "media", "battery", "calendar", "link", "mixer", "sysmon", "clipboard", "glance", "launcher", "recorder"]
+    readonly property var surfaceNames: ["power", "media", "battery", "calendar", "link", "mixer", "sysmon", "clipboard", "glance", "launcher", "recorder", "settings"]
     readonly property var targetScreens: {
         const screens = Quickshell.screens;
         const list = Config.options?.bar?.screenList ?? [];
@@ -127,9 +149,11 @@ Scope {
             id: reserve
             required property var modelData
 
-            readonly property real s: modelData ? (modelData.height / 1080) * root.uiScale : 1
+            readonly property real s: root.scaleForScreen(modelData)
             readonly property real topGapPx: 8 * root.topGap * s
-            readonly property real restHeight: (Config.options?.bar?.pill?.barMode ?? false) ? 58 * s : 38 * s
+            readonly property real restHeight: (Config.options?.bar?.pill?.barMode ?? false)
+                ? Math.max(66, Config.options?.bar?.pill?.expandedHeight ?? 66) * s
+                : Math.max(44, Config.options?.bar?.pill?.restHeight ?? 44) * s
             readonly property real gameBarH: 34 * s
 
             /**
@@ -199,7 +223,7 @@ Scope {
             id: overlay
             required property var modelData
 
-            readonly property real s: modelData ? (modelData.height / 1080) * root.uiScale : 1
+            readonly property real s: root.scaleForScreen(modelData)
             readonly property real topGapPx: 8 * root.topGap * s
             readonly property string surface: root.openMon === modelData.name ? root.openSurface : ""
             readonly property bool surfaceOpen: surface.length > 0

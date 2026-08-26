@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects as GE
+import Quickshell
 import qs.modules.common
 import qs.modules.common.functions
 import qs.modules.common.widgets
@@ -30,9 +31,8 @@ Rectangle {
     // an actual color seat instead of a neutral wallpaper-luminance scrim.
     property color surfaceAccent: Appearance.colors.colPrimary
     property real surfaceRadius: Appearance.zzzEverywhere ? Appearance.zzz.controlRadius : Appearance.rounding.small
-    // Allows per-widget blur override. When false, blur is disabled even if the
-    // active style (aurora/angel) supports it. Lets users get a flat,
-    // non-blurred resources widget while keeping a frosted-glass clock, etc.
+    // Allows per-widget blur override for styles that do not explicitly own
+    // their material. Ricelin Island glass follows the shared Island setting.
     property bool surfaceUseBlur: true
 
     // Follow the owning widget's per-output power state. Standalone surfaces
@@ -49,31 +49,26 @@ Rectangle {
     // otherwise blur twice as wide) and the layer is smoothed on upscale.
     readonly property real _blurScale: 0.5
 
-    readonly property bool _angel: Appearance.angelEverywhere
-    readonly property bool _aurora: Appearance.auroraEverywhere && !Appearance.inirEverywhere
-    readonly property bool _inir: Appearance.inirEverywhere
-    readonly property bool _zzz: Appearance.zzzEverywhere
-    readonly property bool _cookie: Appearance.cookieEverywhere
-    readonly property bool _regalia: Appearance.regaliaEverywhere
-    // Ricelin island dialect is an optional widget skin, but it must not
-    // override a selected global style with its own surface worldview.
-    readonly property bool _island: !root._zzz && !root._cookie && !root._regalia && !root._angel
-        && !root._aurora && !root._inir
-        && (Config.options?.background?.widgets?.style ?? "panel") === "island"
+    readonly property string _surfaceDialect: (Config.options?.background?.widgets?.style ?? "panel") === "island"
+        ? "island" : Appearance.globalStyle
+    readonly property bool _angel: root._surfaceDialect === "angel"
+    readonly property bool _aurora: root._surfaceDialect === "aurora" || root._angel
+    readonly property bool _inir: root._surfaceDialect === "inir"
+    readonly property bool _zzz: root._surfaceDialect === "zzz"
+    readonly property bool _cookie: root._surfaceDialect === "cookie"
+    readonly property bool _regalia: root._surfaceDialect === "regalia"
+    readonly property bool _island: root._surfaceDialect === "island"
     readonly property real _surfaceStrength: Math.max(0, Math.min(1, Number(root.surfaceOpacity) || 0))
     readonly property bool _backgroundVisible: root._surfaceStrength > 0.001
+    // Explicit Island style owns its material opacity. A widget's legacy
+    // backgroundOpacity controls whether the plate exists, but must not multiply
+    // the shared Ricelin opacity again or every widget becomes nearly invisible.
     readonly property real _plateAlpha: root._backgroundVisible
-        ? Math.min(0.96, 0.72 + root._surfaceStrength * 0.24) : 0
-    readonly property real _islandOpacity: Config.options?.appearance?.island?.opacity ?? 1
-    readonly property bool _islandGlass: _island && root._backgroundVisible && root.surfaceUseBlur
-        && (Config.options?.appearance?.island?.glass ?? true) && _islandOpacity < 0.999
-    // Auto preserves the selected global style; an explicit Widgets override
-    // is allowed to opt any card into the shared wallpaper backend.
-    readonly property bool _glass: root._backgroundVisible
-        && Appearance.blurBackendFor("widgets",
-            Appearance.blurTopology.unsupported) === "wallpaper"
+        ? (root._island ? 1 : Math.min(0.96, 0.72 + root._surfaceStrength * 0.24)) : 0
+    readonly property bool _glass: !root._island && root._backgroundVisible
+        && Appearance.blurBackendFor("widgets", Appearance.blurTopology.unsupported) === "wallpaper"
         && root.surfaceUseBlur
-    readonly property string _wallpaperUrl: Wallpapers.effectiveWallpaperUrl
+    readonly property string _wallpaperUrl: WallpaperListener.wallpaperUrlForScreen(root.QsWindow?.window?.screen ?? null)
 
     // Wallpaper region brightness behind the widget (0-1; -1 = unknown).
     // Parent widgets bind their own regionBrightness so the plate opposes the
@@ -272,9 +267,7 @@ Rectangle {
                 : 0.15
             blurEnabled: true
             blurMax: Math.max(1, Math.round(64 * root._blurScale))
-            blur: root._angel ? Appearance.angel.blurIntensity
-                : root._islandGlass ? (Config.options?.appearance?.island?.glassBlur ?? 1)
-                : 0.8
+            blur: root._angel ? Appearance.angel.blurIntensity : 0.8
         }
     }
 
@@ -287,32 +280,17 @@ Rectangle {
             : ColorUtils.transparentize(Appearance.colors.colLayer0Base, Appearance.aurora.popupTransparentize * 1.2)
     }
 
-    // Island card: washi gradient + hairline border + lit top sheen (the blur
-    // above provides the glass; screenX/Y keep its crop aligned per widget).
-    Rectangle {
-        id: islandCard
+    RicelinSurface {
         anchors.fill: parent
-        visible: root._island && (root._backgroundVisible
-            || (root.surfaceBorderWidth > 0 && root.surfaceBorderOpacity > 0))
+        visible: root._island && root._backgroundVisible
         radius: root.radius
-        border.width: root.surfaceBorderWidth
-        border.color: ColorUtils.applyAlpha(Appearance.colors.colLayer0Border,
-            root.surfaceBorderOpacity)
-        gradient: Gradient {
-            GradientStop { position: 0.0; color: Qt.alpha(Appearance.colors.colLayer3,
-                root._islandOpacity * root._plateAlpha) }
-            GradientStop { position: 1.0; color: Qt.alpha(Appearance.colors.colLayer1,
-                root._islandOpacity * root._plateAlpha) }
-        }
-        Rectangle {
-            anchors { top: parent.top; left: parent.left; right: parent.right }
-            anchors.topMargin: 1
-            anchors.leftMargin: islandCard.radius * 0.6
-            anchors.rightMargin: islandCard.radius * 0.6
-            height: 1
-            visible: root._backgroundVisible && (Config.options?.appearance?.island?.sheen ?? true)
-            color: Qt.alpha(Appearance.colors.colOnLayer0, 0.07)
-        }
+        glassEnabled: root.powerActive
+        screen: root.QsWindow?.window?.screen ?? null
+        glassScreenX: root.screenX
+        glassScreenY: root.screenY
+        glassScreenWidth: root.screenWidth
+        glassScreenHeight: root.screenHeight
+        shadow: false
     }
 
     // Inset glow — angel only

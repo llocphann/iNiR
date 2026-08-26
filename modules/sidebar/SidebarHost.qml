@@ -584,8 +584,8 @@ Scope {
         color: "transparent"
         // A closed transparent Overlay surface still prevents direct scanout.
         // Keep it mapped for normal warm opens, but release it while fullscreen
-        // owns this output or manual GameMode explicitly requests a quiet shell.
-        // Explicit fullscreen opens and their exit animation remain usable.
+        // owns this output. Manual GameMode only disables expensive rendering;
+        // explicit opens and their exit animation remain usable.
         visible: root._nativeHostMapped && !GlobalStates.screenLocked
             && (!root.fullscreenCovered || root.presentationOpen
                 || sidebarContentLoader.animating)
@@ -643,7 +643,13 @@ Scope {
             interval: 240
             repeat: false
             onTriggered: {
-                if (root.edgeRevealTransient && !sidebarPanelHover.hovered)
+                if (!root.edgeRevealTransient)
+                    return
+                if (GlobalStates.activeContextMenuCount > 0) {
+                    edgeRevealCloseTimer.restart()
+                    return
+                }
+                if (!sidebarPanelHover.hovered)
                     root.setRoleOpen(false)
             }
         }

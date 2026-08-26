@@ -364,7 +364,16 @@ Singleton {
                 return true
             }
 
-            ShellExec.execDetachedArgs(command,
+            const executable = command[0].split("/").pop().toLowerCase()
+            const isVentoyGui = executable === "ventoygui" || executable.startsWith("ventoygui.")
+            const hasVentoyFrontend = command.slice(1).some(arg => /^--(gtk[234]|qt[456])$/.test(arg.toLowerCase()))
+            const graphicalCommand = isVentoyGui && !hasVentoyFrontend
+                ? [command[0], "--qt5", ...command.slice(1)]
+                : command
+            const launchCommand = (executable === "gparted" || isVentoyGui)
+                ? [Quickshell.shellPath("scripts/launch-privileged-gui.sh"), ...graphicalCommand]
+                : graphicalCommand
+            ShellExec.execDetachedArgs(launchCommand,
                 displayName.length > 0 ? `Launch ${displayName}` : "",
                 workingDirectory)
             return true

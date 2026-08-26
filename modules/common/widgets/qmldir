@@ -93,6 +93,7 @@ PointingHandInteraction 1.0 PointingHandInteraction.qml
 PointingHandLinkHover 1.0 PointingHandLinkHover.qml
 PopupToolTip 1.0 PopupToolTip.qml
 ResourceCard 1.0 ResourceCard.qml
+RicelinSurface 1.0 RicelinSurface.qml
 Revealer 1.0 Revealer.qml
 RegaliaControlFace 1.0 RegaliaControlFace.qml
 RegaliaPlate 1.0 RegaliaPlate.qml
@@ -120,6 +121,7 @@ ShellDesaturationEffect 1.0 ShellDesaturationEffect.qml
 singleton SettingsMaterialPreset 1.0 SettingsMaterialPreset.qml
 singleton SettingsSearchRegistry 1.0 SettingsSearchRegistry.qml
 SettingsSwitch 1.0 SettingsSwitch.qml
+SettingsTaskNavigator 1.0 SettingsTaskNavigator.qml
 SineCookie 1.0 SineCookie.qml
 SmartAppIcon 1.0 SmartAppIcon.qml
 StyledBlurEffect 1.0 StyledBlurEffect.qml

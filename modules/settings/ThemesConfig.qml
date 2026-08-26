@@ -69,6 +69,23 @@ ContentPage {
 
     settingsPageIndex: 4
     settingsPageName: Translation.tr("Themes")
+    property string activeSection: "colors"
+
+    SettingsTaskNavigator {
+        icon: "palette"
+        title: Translation.tr("Themes")
+        description: Translation.tr("Choose colors and the global visual language first; typography, motion and expert theme tooling stay in their own focused views.")
+        summary: Translation.tr("Colors · style · typography · motion · advanced")
+        currentValue: root.activeSection
+        onSelected: value => root.activeSection = value
+        options: [
+            { displayName: Translation.tr("Colors"), icon: "palette", value: "colors" },
+            { displayName: Translation.tr("Style"), icon: "style", value: "style" },
+            { displayName: Translation.tr("Type"), icon: "text_format", value: "type" },
+            { displayName: Translation.tr("Motion"), icon: "animation", value: "motion" },
+            { displayName: Translation.tr("Advanced"), icon: "construction", value: "advanced" }
+        ]
+    }
 
     function isFontInstalled(fontName) {
         if (!fontName || fontName.trim() === "") return false
@@ -77,6 +94,8 @@ ContentPage {
     }
 
     SettingsCardSection {
+        settingsTaskSection: "colors"
+        visible: root.activeSection === "colors"
         expanded: true
         icon: "palette"
         title: Translation.tr("Color Themes")
@@ -639,7 +658,9 @@ ContentPage {
 
     // Scheme Variant Section
     SettingsCardSection {
-        expanded: false
+        settingsTaskSection: "colors"
+        visible: root.activeSection === "colors"
+        expanded: true
         icon: "tune"
         title: Translation.tr("Scheme Variant")
 
@@ -692,8 +713,9 @@ ContentPage {
 
     // Motion Section
     SettingsCardSection {
-        visible: (Config.options?.panelFamily ?? "ii") !== "waffle"
-        expanded: false
+        settingsTaskSection: "motion"
+        visible: root.activeSection === "motion" && (Config.options?.panelFamily ?? "ii") !== "waffle"
+        expanded: true
         icon: "animation"
         title: Translation.tr("Motion")
 
@@ -833,8 +855,9 @@ ContentPage {
 
     // Theme Scheduling Section
     SettingsCardSection {
-        visible: !(Config.options?.settingsUi?.easyMode ?? false)
-        expanded: false
+        settingsTaskSection: "motion"
+        visible: root.activeSection === "motion" && !(Config.options?.settingsUi?.easyMode ?? false)
+        expanded: true
         icon: "schedule"
         title: Translation.tr("Theme Scheduling")
 
@@ -1068,8 +1091,9 @@ ContentPage {
     // Terminal Colors Section
     SettingsCardSection {
         id: terminalColorsSection
-        visible: !(Config.options?.settingsUi?.easyMode ?? false)
-        expanded: false
+        settingsTaskSection: "advanced"
+        visible: root.activeSection === "advanced" && !(Config.options?.settingsUi?.easyMode ?? false)
+        expanded: true
         icon: "terminal"
         title: Translation.tr("Terminal Colors")
 
@@ -1538,7 +1562,9 @@ ContentPage {
     }
 
     SettingsCardSection {
-        expanded: false
+        settingsTaskSection: "style"
+        visible: root.activeSection === "style"
+        expanded: true
         icon: "style"
         title: Translation.tr("Global Style")
 
@@ -1583,8 +1609,9 @@ ContentPage {
 
     SettingsCardSection {
         id: auroraStyleEditorSection
-        visible: Appearance.auroraEverywhere && !Appearance.angelEverywhere
-        expanded: false
+        settingsTaskSection: "style"
+        visible: root.activeSection === "style" && Appearance.auroraEverywhere && !Appearance.angelEverywhere
+        expanded: true
         icon: "blur_on"
         title: Translation.tr("Aurora Style Editor")
 
@@ -1599,8 +1626,9 @@ ContentPage {
 
     SettingsCardSection {
         id: angelStyleEditorSection
-        visible: Appearance.angelEverywhere
-        expanded: false
+        settingsTaskSection: "style"
+        visible: root.activeSection === "style" && Appearance.angelEverywhere
+        expanded: true
         icon: "raven"
         title: Translation.tr("Angel Style Editor")
 
@@ -1615,8 +1643,9 @@ ContentPage {
 
     SettingsCardSection {
         id: regaliaStyleEditorSection
-        visible: Appearance.regaliaEverywhere
-        expanded: false
+        settingsTaskSection: "style"
+        visible: root.activeSection === "style" && Appearance.regaliaEverywhere
+        expanded: true
         icon: "event_seat"
         title: Translation.tr("Regalia Style Editor")
 
@@ -1631,8 +1660,9 @@ ContentPage {
 
     SettingsCardSection {
         id: zzzStyleEditorSection
-        visible: Appearance.zzzEverywhere
-        expanded: false
+        settingsTaskSection: "style"
+        visible: root.activeSection === "style" && Appearance.zzzEverywhere
+        expanded: true
         icon: "bolt"
         title: Translation.tr("ZZZ Style Editor")
 
@@ -1647,8 +1677,9 @@ ContentPage {
 
     SettingsCardSection {
         id: customThemeEditorSection
-        visible: !(Config.options?.settingsUi?.easyMode ?? false)
-        expanded: false
+        settingsTaskSection: "advanced"
+        visible: root.activeSection === "advanced" && !(Config.options?.settingsUi?.easyMode ?? false)
+        expanded: true
         icon: "edit"
         title: Translation.tr("Custom Theme Editor")
 
@@ -1663,8 +1694,9 @@ ContentPage {
 
     SettingsCardSection {
         id: gowallEditorSection
-        visible: !(Config.options?.settingsUi?.easyMode ?? false)
-        expanded: false
+        settingsTaskSection: "advanced"
+        visible: root.activeSection === "advanced" && !(Config.options?.settingsUi?.easyMode ?? false)
+        expanded: true
         icon: "wallpaper"
         title: Translation.tr("Gowall Wallpaper Editor")
 
@@ -1678,7 +1710,9 @@ ContentPage {
     }
 
     SettingsCardSection {
-        expanded: false
+        settingsTaskSection: "type"
+        visible: root.activeSection === "type"
+        expanded: true
         icon: "text_format"
         title: Translation.tr("Typography")
 
@@ -1910,7 +1944,9 @@ ContentPage {
     }
 
     SettingsCardSection {
-        expanded: false
+        settingsTaskSection: "type"
+        visible: root.activeSection === "type"
+        expanded: true
         icon: "folder"
         title: Translation.tr("Icon Theme")
 
@@ -1944,8 +1980,9 @@ ContentPage {
     }
 
     SettingsCardSection {
-        visible: !(Config.options?.settingsUi?.easyMode ?? false)
-        expanded: false
+        settingsTaskSection: "advanced"
+        visible: root.activeSection === "advanced" && !(Config.options?.settingsUi?.easyMode ?? false)
+        expanded: true
         icon: "info"
         title: Translation.tr("About Themes")
 

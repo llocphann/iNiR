@@ -366,7 +366,11 @@ if is_arch_like; then
         setup_progress 6 $TOTAL "Applying iNiR Spicetify theme"
         theme_script="$SCRIPT_DIR/../colors/apply-spicetify-theme.sh"
         if [[ -x "$theme_script" ]]; then
-            if "$theme_script"; then
+            theme_name="$(jq -r '.appearance.wallpaperTheming.spicetifyTheme // "Inir"' "$CONFIG_PATH" 2>/dev/null)"
+            if [[ "$theme_name" != "Inir" && "$theme_name" != "InirTUI" ]]; then
+                theme_name="Inir"
+            fi
+            if "$theme_script" --theme "$theme_name"; then
                 echo "iNiR theme applied."
             else
                 echo "warning: theme script returned non-zero; rerun it manually if Spotify looks unstyled." >&2

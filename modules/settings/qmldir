@@ -15,3 +15,5 @@ SettingsOverlay 1.0 SettingsOverlay.qml
 SettingsFocus 1.0 SettingsFocus.qml
 SettingsPageHost 1.0 SettingsPageHost.qml
 SettingsNativeDialogGuard 1.0 SettingsNativeDialogGuard.qml
+PillOptionsEditor 1.0 PillOptionsEditor.qml
+RicelinIslandEditor 1.0 RicelinIslandEditor.qml

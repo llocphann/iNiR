@@ -59,7 +59,7 @@ Item { // Bar content region
         const mapped = mouseArea.mapToItem(root, clickX, clickY)
         barContextMenuAnchor.x = mapped.x
         barContextMenuAnchor.y = (Config.options?.bar?.bottom ?? false) ? 0 : root.height
-        barContextMenu.active = true
+        barContextMenu.requestOpen()
     }
 
     ContextMenu {
@@ -169,6 +169,13 @@ Item { // Bar content region
     // horizontal capsule padding the edge islands wrap their content with.
     readonly property int islandInset: Config.options?.bar?.islands?.inset ?? 4
     readonly property int islandPad: Config.options?.bar?.islands?.padding ?? 12
+    readonly property real islandShadowAllowance: root.isIslands
+        && Appearance.effectsEnabled
+        && (Config.options?.appearance?.island?.shadow ?? true)
+        ? Appearance.sizes.elevationMargin : 0
+    readonly property real islandOuterInset: root.isIslands
+        ? Math.max(Appearance.sizes.hyprlandGapsOut, root.islandShadowAllowance)
+        : Appearance.sizes.hyprlandGapsOut
     readonly property bool isScenic: root.barAppearance === "scenic"
     readonly property bool isFrame: root.barAppearance === "frame"
     // Name the exact Region topology published by Bar.qml. A five-card islands
@@ -291,21 +298,11 @@ Item { // Bar content region
     // capsule left content poking outside it for the whole animation. Motion
     // is applied at the SOURCE instead (the activeWindow wrapper animates its
     // implicitWidth), so row and capsule move through the same frames.
-    component EdgeIsland: IslandPanel {
+    component EdgeIsland: BarIslandSurface {
         id: edgeIsland
         glassEnabled: true
         nativeBlurActive: root.nativeBlurActive
         screen: root.screen
-        glassScreenX: {
-            const geometryDependency = x + width + (parent?.x ?? 0)
-            return mapToItem(null, 0, 0).x
-        }
-        glassScreenY: {
-            const geometryDependency = y + height + (parent?.y ?? 0)
-            return mapToItem(null, 0, 0).y
-        }
-        glassScreenWidth: root.screen?.width ?? 1920
-        glassScreenHeight: root.screen?.height ?? 1080
 
         readonly property real spectrumX: {
             const geometryDependency = edgeIsland.x + edgeIsland.y
@@ -1039,7 +1036,7 @@ Item { // Bar content region
             anchors.left: parent.left
             anchors.right: root.isIslands ? undefined : parent.right
             anchors.leftMargin: root.isIslands
-                ? Appearance.sizes.hyprlandGapsOut + root.islandPad
+                ? root.islandOuterInset + root.islandPad
                 : Appearance.rounding.screenRounding
             anchors.rightMargin: Appearance.rounding.screenRounding
             spacing: 10
@@ -1155,7 +1152,7 @@ Item { // Bar content region
             // which would leave dead space in the lighter side). Classic keeps the
             // mirrored width so the two side pills stay visually balanced.
             implicitWidth: empty ? 0 : (root.isIslands ? Math.min(contentWidth, root.centerSideMaxWidth) : root._pillWidth(contentWidth))
-            clip: true
+            clipContent: true
 
             Repeater {
                 model: root._centerLeftIds
@@ -1226,7 +1223,7 @@ Item { // Bar content region
                 // which would leave dead space in the lighter side). Classic keeps the
                 // mirrored width so the two side pills stay visually balanced.
                 implicitWidth: empty ? 0 : (root.isIslands ? Math.min(contentWidth, root.centerSideMaxWidth) : root._pillWidth(contentWidth))
-                clip: true
+                clipContent: true
 
                 Repeater {
                     model: root._centerRightIds
@@ -1349,7 +1346,7 @@ Item { // Bar content region
             anchors.left: root.isIslands ? undefined : parent.left
             anchors.leftMargin: Appearance.rounding.screenRounding
             anchors.rightMargin: root.isIslands
-                ? Appearance.sizes.hyprlandGapsOut + root.islandPad
+                ? root.islandOuterInset + root.islandPad
                 : Appearance.rounding.screenRounding
             spacing: 5
             layoutDirection: Qt.RightToLeft

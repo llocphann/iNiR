@@ -430,7 +430,17 @@ Item { // Wrapper
 
     StyledRectangularShadow {
         target: searchWidgetContent
+        visible: !root.islandStyle
     }
+
+    IslandPanel {
+        anchors.fill: searchWidgetContent
+        visible: root.islandStyle
+        radius: searchWidgetContent.radius
+        glassEnabled: true
+        screen: root.QsWindow?.window?.screen ?? null
+    }
+
     GlassBackground { // Background
         id: searchWidgetContent
         anchors {
@@ -441,7 +451,10 @@ Item { // Wrapper
         clip: true
         implicitWidth: columnLayout.implicitWidth
         implicitHeight: columnLayout.implicitHeight
-        radius: root.zzzEverywhere ? Appearance.zzz.panelRadius
+        radius: root.islandStyle
+            ? (root.showResults ? (Config.options?.appearance?.island?.radius ?? 18)
+                : searchBar.height / 2 + searchBar.verticalPadding)
+            : root.zzzEverywhere ? Appearance.zzz.panelRadius
             : Appearance.regaliaEverywhere
                 ? (root.showResults ? Appearance.regalia.panelRadius : Appearance.regalia.roundLarge)
                 : searchBar.height / 2 + searchBar.verticalPadding
@@ -480,30 +493,6 @@ Item { // Wrapper
             inset: root.showResults ? Appearance.regalia.surfaceInset : Appearance.regalia.controlInset
             elevated: true
             glassEnabled: true
-        }
-
-        // Ricelin island face — outer shadow already comes from
-        // StyledRectangularShadow; content is masked to this same radius.
-        IslandPanel {
-            anchors.fill: parent
-            visible: root.islandStyle
-            radius: searchWidgetContent.radius
-            shadow: false
-            glassEnabled: true
-            // The overview window is fullscreen, so window coords ARE screen
-            // coords; re-map when the search surface moves or resizes.
-            glassScreenX: {
-                void searchWidgetContent.width;
-                void searchWidgetContent.height;
-                return searchWidgetContent.mapToItem(null, 0, 0).x;
-            }
-            glassScreenY: {
-                void searchWidgetContent.width;
-                void searchWidgetContent.height;
-                return searchWidgetContent.mapToItem(null, 0, 0).y;
-            }
-            glassScreenWidth: root.QsWindow?.window?.screen?.width ?? 1920
-            glassScreenHeight: root.QsWindow?.window?.screen?.height ?? 1080
         }
 
         // Collapsed search: a CLEAN plate (just the left category accent bar). The

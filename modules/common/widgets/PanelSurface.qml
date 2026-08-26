@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import Quickshell
 import qs.modules.common
 import qs.modules.common.functions
 
@@ -55,10 +56,18 @@ Item {
     // esmerilado y no como agujero. El consumidor pasa su posición en
     // coordenadas de pantalla (los mismos números que usan los sidebars).
     property bool wallpaperBackdrop: false
-    property real backdropScreenX: 0
-    property real backdropScreenY: 0
-    property real backdropScreenWidth: 1920
-    property real backdropScreenHeight: 1080
+    property real backdropScreenX: {
+        const geometryDependency = root.x + root.y + root.width + root.height
+        return root.mapToItem(null, 0, 0).x
+    }
+    property real backdropScreenY: {
+        const geometryDependency = root.x + root.y + root.width + root.height
+        return root.mapToItem(null, 0, 0).y
+    }
+    property real backdropScreenWidth: root.QsWindow?.window?.screen?.width
+        ?? Quickshell.screens[0]?.width ?? 1920
+    property real backdropScreenHeight: root.QsWindow?.window?.screen?.height
+        ?? Quickshell.screens[0]?.height ?? 1080
 
     // Cara island Ricelin (opt-in por superficie, gateada por config del
     // consumidor): gradiente washi + hairline + sheen + glass, dibujada con
@@ -70,21 +79,16 @@ Item {
     property string surfaceDialect: ""
 
     readonly property string _resolvedDialect: root.surfaceDialect.length > 0
-        ? root.surfaceDialect : Appearance.globalStyle
+        ? root.surfaceDialect : root.islandSkin ? "island" : Appearance.globalStyle
     readonly property bool _zzz: root._resolvedDialect === "zzz"
     readonly property bool _angel: root._resolvedDialect === "angel"
     readonly property bool _regalia: root._resolvedDialect === "regalia"
     readonly property bool _inir: root._resolvedDialect === "inir"
     readonly property bool _aurora: root._resolvedDialect === "aurora" || root._angel
     readonly property bool _cookie: root._resolvedDialect === "cookie"
-    readonly property bool _island: root.surfaceDialect.length > 0
-        ? root._resolvedDialect === "island"
-        : root.islandSkin && !root._zzz
-    readonly property real _islandOpacity: Config.options?.appearance?.island?.opacity ?? 1
+    readonly property bool _island: root._resolvedDialect === "island"
     readonly property bool _backdropActive: !root.borderless && Appearance.effectsEnabled
-        && ((root.wallpaperBackdrop && root._aurora)
-            || (root._island && (Config.options?.appearance?.island?.glass ?? true)
-                && root._islandOpacity < 0.999))
+        && root.wallpaperBackdrop && root._aurora
 
     // ── Color de fondo (misma elección que hacían los paneles a mano) ──
     readonly property color _fill: root.borderless ? "transparent"
@@ -127,10 +131,9 @@ Item {
         anchors.fill: parent
         visible: root._backdropActive
         wallpaperBackdropEnabled: root._backdropActive
-        // Island glass fuera de aurora: GlassBackground gatea su blur a aurora,
-        // forceBackdrop lo enciende igual. Blur fijo de la casa (island.glassBlur
-        // fino queda para IslandPanel, que alinea offsets por superficie).
-        forceBackdrop: root._backdropActive && root._island
+        blurStrength: 1
+        saturationStrength: 0.2
+        auroraTransparency: Appearance.aurora.popupTransparentize
         radius: root._radius
         screenX: root.backdropScreenX
         screenY: root.backdropScreenY
@@ -159,28 +162,13 @@ Item {
         }
     }
 
-    // ── Cara island (Ricelin): gradiente cardTop→cardBot + hairline + sheen ──
-    Rectangle {
-        id: islandFace
+    RicelinSurface {
         anchors.fill: parent
-        visible: root._island
+        visible: root._island && !root.borderless
         radius: root._radius
-        border.width: root.outlined ? 1 : 0
-        border.color: Appearance.colors.colLayer0Border
-        gradient: Gradient {
-            GradientStop { position: 0.0; color: Qt.alpha(Appearance.colors.colLayer3, root._islandOpacity) }
-            GradientStop { position: 1.0; color: Qt.alpha(Appearance.colors.colLayer1, root._islandOpacity) }
-        }
-
-        Rectangle {
-            anchors { top: parent.top; left: parent.left; right: parent.right }
-            anchors.topMargin: 1
-            anchors.leftMargin: islandFace.radius * 0.6
-            anchors.rightMargin: islandFace.radius * 0.6
-            height: 1
-            visible: Config.options?.appearance?.island?.sheen ?? true
-            color: Qt.alpha(Appearance.colors.colOnLayer0, 0.07)
-        }
+        glassEnabled: root.wallpaperBackdrop
+        screen: root.QsWindow?.window?.screen ?? null
+        shadow: false
     }
 
     // ── Regalia: fitted shell composition. The hard chassis contains a

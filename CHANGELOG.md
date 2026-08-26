@@ -5,6 +5,26 @@ All notable changes to iNiR will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [2.29.3] - 2026-08-25
+
+A polish release for Pill controls and surfaces, settings navigation, TUI app themes, and several runtime fixes including privileged graphical apps and audio feedback stability.
+
+### Added
+- **TUI app themes**: Discord/Vesktop gains an iNiR TUI flavor on top of System24, and Spotify gains an `InirTUI` Spicetify flavor based on the upstream `text` theme. Settings can switch Spotify between Sleek and TUI while preserving wallpaper-driven iNiR colors; Text receives semantic iNiR accent/border/header/highlight roles and readable playback-control contrast without forking its layout.
+- **Pill controls and app mixer**: battery display can use icon, percentage or both; Now Playing gets a wide hover-row capsule with wheel volume control instead of relying on the tiny side bud; monitor-aware sizing plus roomier calendar/weather, launcher, tray, workspace and shared search controls improve 1080p+ usability; Super+Space can open either iNiR Overview or the Pill launcher; a Ricelin settings index links directly into iNiR settings pages; and Mixer uses Ricelin-style vertical output/app faders with resolved desktop-entry names/icons, wheel volume, mute controls, a horizontally scrollable app rail, and a separate System view.
+
+### Changed
+- **Pill and Ricelin settings**: Pill setup is now grouped by interaction, readability, surfaces, hover row, clock/glyphs and advanced geometry with a live shape preview; Pill and every Ricelin Island surface now consume one body-opacity/glass material with shared blur, radius, shadow and sheen, including nested PanelSurface consumers.
+- **Settings navigation**: dense multi-purpose pages use task-oriented sections, and search activates the owning section before focusing a result across standalone and overlay hosts.
+
+### Fixed
+- **Audio and media feedback**: right-sidebar volume writes are coalesced to prevent freezes and Pill media wheel feedback follows the effective player stream without jumping to zero; explicit track changes still show the media OSD while automatic changes can stay suppressed during games or fullscreen sessions.
+- **Privileged graphical apps**: GParted and Ventoy retain the Wayland/XWayland session environment after Polkit authentication; Ventoy uses its Qt frontend instead of forcing an inaccessible root X11 connection.
+- **Pill notifications**: blank or whitespace-only notification actions are ignored instead of rendering empty action buttons, and the unread indicator remains anchored to the capsule.
+- **Text fields**: shared fields no longer expose native Material outline fragments beneath custom global-style surfaces.
+
 ## [2.29.2] - 2026-08-24
 
 A focused polish release for Regalia, wallpapers, startup reliability, bar behavior, and recent runtime regressions.

@@ -286,17 +286,10 @@ Scope {
                                 anchors.bottomMargin: root.position === "bottom" ? Appearance.sizes.hyprlandGapsOut : (root.isVertical ? 0 : Appearance.sizes.elevationMargin)
                                 anchors.leftMargin: root.isLeft ? Appearance.sizes.hyprlandGapsOut : (root.isVertical ? Appearance.sizes.elevationMargin : 0)
                                 anchors.rightMargin: root.position === "right" ? Appearance.sizes.hyprlandGapsOut : (root.isVertical ? Appearance.sizes.elevationMargin : 0)
-                                visible: (Config.options?.dock?.showBackground ?? true) && !Appearance.gameModeMinimal && root.isIslandStyle
+                                visible: (Config.options?.dock?.showBackground ?? true) && root.isIslandStyle
                                 glassEnabled: true
                                 nativeBlurActive: dockRoot.nativeBlurActive
-                                glassScreenWidth: dockRoot.screen?.width ?? 1920
-                                glassScreenHeight: dockRoot.screen?.height ?? 1080
-                                glassScreenX: root.isVertical
-                                    ? (root.isLeft ? Appearance.sizes.hyprlandGapsOut : glassScreenWidth - width - Appearance.sizes.hyprlandGapsOut)
-                                    : (glassScreenWidth - width) / 2
-                                glassScreenY: root.isVertical
-                                    ? (glassScreenHeight - height) / 2
-                                    : (root.isTop ? Appearance.sizes.hyprlandGapsOut : glassScreenHeight - height - Appearance.sizes.hyprlandGapsOut)
+                                screen: dockRoot.screen
                                 // Docked panels round a touch harder than the bar;
                                 // still follows the shared island skin knob.
                                 radius: (Config.options?.appearance?.island?.radius ?? 18) + 4

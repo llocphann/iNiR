@@ -397,6 +397,20 @@ Item {
         visible: sidebarRightBackground.angelEverywhere
             && !Appearance.gameModeMinimal
     }
+
+    IslandPanel {
+        anchors.fill: sidebarRightBackground
+        visible: sidebarRightBackground.islandStyle
+        radius: sidebarRightBackground.radius
+        glassEnabled: true
+        screen: root.panelScreen ?? root.QsWindow?.window?.screen ?? null
+        glassScreenX: root.screenWidth - sidebarRightBackground.width
+            - Appearance.sizes.hyprlandGapsOut
+        glassScreenY: Appearance.sizes.hyprlandGapsOut
+        glassScreenWidth: root.screenWidth
+        glassScreenHeight: root.screenHeight
+    }
+
     Rectangle {
         id: sidebarRightBackground
 
@@ -510,21 +524,6 @@ Item {
                 height: sidebarRightBackground.height
                 radius: sidebarRightBackground.radius
             }
-        }
-
-        // Ricelin island face. Tonal separation replaces the redundant outer
-        // blur shadow; the OpacityMask would clip a MultiEffect shadow anyway,
-        // so IslandPanel's own pass stays off.
-        IslandPanel {
-            anchors.fill: parent
-            visible: sidebarRightBackground.islandStyle && !sidebarRightBackground.gameModeMinimal
-            radius: sidebarRightBackground.radius
-            shadow: false
-            glassEnabled: true
-            glassScreenX: root.screenWidth - sidebarRightBackground.width - Appearance.sizes.hyprlandGapsOut
-            glassScreenY: Appearance.sizes.hyprlandGapsOut
-            glassScreenWidth: root.screenWidth ?? 1920
-            glassScreenHeight: root.screenHeight ?? 1080
         }
 
         Image {

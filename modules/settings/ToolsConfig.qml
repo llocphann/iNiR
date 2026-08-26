@@ -11,6 +11,23 @@ ContentPage {
     id: root
     settingsPageIndex: 6
     settingsPageName: Translation.tr("Tools")
+    property string activeSection: "recording"
+
+    SettingsTaskNavigator {
+        icon: "build"
+        title: Translation.tr("Tools")
+        description: Translation.tr("Open only the tool you are configuring; capture, selection and overlay controls no longer share one long settings stack.")
+        summary: Translation.tr("Recording · snipping · crosshair · Discord · OSD")
+        currentValue: root.activeSection
+        onSelected: value => root.activeSection = value
+        options: [
+            { displayName: Translation.tr("Recording"), icon: "screen_record", value: "recording" },
+            { displayName: Translation.tr("Snipping"), icon: "screenshot_frame_2", value: "snipping" },
+            { displayName: Translation.tr("Crosshair"), icon: "point_scan", value: "crosshair" },
+            { displayName: Translation.tr("Discord"), icon: "forum", value: "discord" },
+            { displayName: Translation.tr("OSD"), icon: "voting_chip", value: "osd" }
+        ]
+    }
 
     property bool recordingCapabilitiesLoaded: false
     property var detectedVideoCodecs: []
@@ -322,7 +339,9 @@ ContentPage {
 
     SettingsCardSection {
         id: screenRecordSection
-        expanded: false
+        settingsTaskSection: "recording"
+        visible: root.activeSection === "recording"
+        expanded: true
         icon: "screen_record"
         title: Translation.tr("Screen recording")
 
@@ -665,7 +684,9 @@ ContentPage {
     }
 
     SettingsCardSection {
-        expanded: false
+        settingsTaskSection: "snipping"
+        visible: root.activeSection === "snipping"
+        expanded: true
         icon: "screenshot_frame_2"
         title: Translation.tr("Region selector (screen snipping/Google Lens)")
 
@@ -839,7 +860,9 @@ ContentPage {
     }
 
     SettingsCardSection {
-        expanded: false
+        settingsTaskSection: "crosshair"
+        visible: root.activeSection === "crosshair"
+        expanded: true
         icon: "point_scan"
         title: Translation.tr("Crosshair overlay")
 
@@ -881,7 +904,9 @@ ContentPage {
     }
 
     SettingsCardSection {
-        expanded: false
+        settingsTaskSection: "discord"
+        visible: root.activeSection === "discord"
+        expanded: true
         icon: "forum"
         title: Translation.tr("Overlay: Discord")
 
@@ -899,7 +924,9 @@ ContentPage {
     }
 
     SettingsCardSection {
-        expanded: false
+        settingsTaskSection: "osd"
+        visible: root.activeSection === "osd"
+        expanded: true
         icon: "voting_chip"
         title: Translation.tr("On-screen display")
 
@@ -912,7 +939,7 @@ ContentPage {
                     Config.setNestedValue("osd.mediaEnabled", checked);
                 }
                 StyledToolTip {
-                    text: Translation.tr("Show now playing feedback when media shortcuts are pressed")
+                    text: Translation.tr("Show feedback for explicit media controls and Pill track changes. During games, explicit skips stay visible while automatic track progression stays hidden.")
                 }
             }
 

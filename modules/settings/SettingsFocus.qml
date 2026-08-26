@@ -342,6 +342,7 @@ Scope {
             return;
         }
 
+        SettingsSearchRegistry.activateTaskSectionForControl(control);
         SettingsSearchRegistry.expandSectionForControl(control);
 
         var flick = root._findParentFlickable(control);

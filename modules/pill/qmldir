@@ -29,6 +29,7 @@ singleton PillPlayers 1.0 PillPlayers.qml
 PillPower 1.0 PillPower.qml
 Pill 1.0 Pill.qml
 PillRecorder 1.0 PillRecorder.qml
+PillSettings 1.0 PillSettings.qml
 PillSpectrumWings 1.0 PillSpectrumWings.qml
 PillSurface 1.0 PillSurface.qml
 singleton PillSysmon 1.0 PillSysmon.qml

@@ -573,25 +573,11 @@ Singleton {
             keywords: ["m3", "resources", "cpu", "ram", "temperature", "disk", "swap", "threshold", "dock", "utility", "screenshot", "mic", "wallpaper"]
         },
         {
-            pageIndex: 2, pageName: root.pages[2].name,
-            section: Translation.tr("Appearance & Layout"),
-            label: Translation.tr("Pill options"),
-            description: Translation.tr("Morphing pill bar: bar mode, compact notifications, scale, opacity, gaps, glyphs and surfaces"),
-            keywords: ["pill", "bar", "morph", "island", "kanji", "glyph", "visualizer", "sysmon", "system", "clipboard", "scale", "gap", "expanded", "persistent", "compact", "toast", "osd", "notification"]
-        },
-        {
-            pageIndex: 2, pageName: root.pages[2].name,
-            section: Translation.tr("Appearance & Layout"),
-            label: Translation.tr("Pill hover row"),
-            description: Translation.tr("Toggle each module of the expanded pill row, plus pill toasts and OSD"),
-            keywords: ["pill", "hover", "row", "modules", "workspaces", "weather", "tray", "wifi", "battery", "inbox", "mixer", "sidebar", "power", "toast", "osd", "notification", "soul", "bead", "icon", "size", "spacing"]
-        },
-        {
             pageIndex: 21, pageName: root.pages[21].name,
-            section: Translation.tr("Glyphs"),
-            label: Translation.tr("Pill glyphs"),
-            description: Translation.tr("Swap any Japanese character the pill uses for your own"),
-            keywords: ["ricelin", "glyph", "kanji", "japanese", "character", "letter", "custom", "pill"]
+            section: Translation.tr("Pill bar"),
+            label: Translation.tr("Pill setup"),
+            description: Translation.tr("Behavior, entry points, readability, surfaces, hover-row modules, clock, glyphs and advanced geometry"),
+            keywords: ["ricelin", "pill", "bar", "morph", "launcher", "media", "overview", "kanji", "glyph", "sysmon", "clipboard", "scale", "gap", "expanded", "persistent", "compact", "toast", "osd", "notification", "hover", "row", "workspaces", "weather", "tray", "wifi", "battery", "mixer", "sidebar", "power", "soul", "bead", "icon", "size", "spacing"]
         },
         {
             pageIndex: 2, pageName: root.pages[2].name,
@@ -604,15 +590,15 @@ Singleton {
             pageIndex: 21, pageName: root.pages[21].name,
             section: Translation.tr("Pill bar"),
             label: Translation.tr("Ricelin dialect"),
-            description: Translation.tr("Pill bar, compact notifications and optional surfaces: glance, launcher, clipboard, sysmon, recorder"),
-            keywords: ["ricelin", "pill", "bar", "mode", "glance", "today", "launcher", "apps", "recorder", "record", "clipboard", "sysmon", "surfaces", "washi", "flame", "toast", "osd", "compact", "notification"]
+            description: Translation.tr("Enable the Ricelin Pill bar and configure it in this page"),
+            keywords: ["ricelin", "pill", "bar", "mode", "setup", "washi", "flame"]
         },
         {
             pageIndex: 21, pageName: root.pages[21].name,
             section: Translation.tr("Island surfaces"),
-            label: Translation.tr("Island styles"),
-            description: Translation.tr("Ricelin island card for the pill bar, dock, sidebars and search, plus the shared skin"),
-            keywords: ["ricelin", "island", "pill", "dock", "sidebar", "search", "card", "gradient", "sheen", "radius", "opacity", "shadow", "skin", "glass", "blur", "transparency"]
+            label: Translation.tr("Island surfaces and skin"),
+            description: Translation.tr("Shared Ricelin body opacity, glass background, blur, radius and surface opt-ins"),
+            keywords: ["ricelin", "island", "dock", "sidebar", "search", "control panel", "widgets", "workspace strip", "card", "body", "opacity", "glass", "background", "blur", "radius", "sheen", "shadow", "skin", "transparency"]
         },
         {
             pageIndex: 2, pageName: root.pages[2].name,
@@ -1250,9 +1236,9 @@ Singleton {
         },
         {
             pageIndex: 21, pageName: root.pages[21].name,
-            section: Translation.tr("Island skin"),
-            label: Translation.tr("Island look"),
-            description: Translation.tr("Radius, opacity, shadow, top sheen and glass of every island surface, including the pill bar"),
+            section: Translation.tr("Island surfaces"),
+            label: Translation.tr("Island body & glass"),
+            description: Translation.tr("Shared body opacity, glass background, blur, radius, shadow and top edge for Ricelin surfaces"),
             keywords: ["island", "pill", "radius", "opacity", "shadow", "sheen", "card", "gradient", "ricelin", "skin", "glass", "blur", "transparency"]
         },
         {
@@ -1350,8 +1336,8 @@ Singleton {
             pageIndex: 6, pageName: root.pages[6].name,
             section: Translation.tr("On-screen display"),
             label: Translation.tr("Media OSD"),
-            description: Translation.tr("Show now playing feedback when media shortcuts are pressed"),
-            keywords: ["osd", "media", "music", "player", "shortcuts"]
+            description: Translation.tr("Control explicit media feedback and Pill track announcements; automatic changes stay hidden during games"),
+            keywords: ["osd", "media", "music", "player", "shortcuts", "pill", "track", "fullscreen", "game", "automatic", "skip"]
         },
         {
             pageIndex: 5, pageName: root.pages[5].name,

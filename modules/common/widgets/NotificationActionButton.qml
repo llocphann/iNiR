@@ -10,10 +10,13 @@ RippleButton {
     id: button
     property string buttonText: ""
     property var urgency: NotificationUrgency.Normal
-    readonly property bool critical: button.urgency === undefined || button.urgency === null
-        ? false
-        : button.urgency === NotificationUrgency.Critical
-            || String(button.urgency).toLowerCase() === "critical"
+    readonly property bool critical: {
+        const value = button.urgency
+        if (value === undefined || value === null)
+            return false
+        return value === NotificationUrgency.Critical
+            || String(value).toLowerCase() === "critical"
+    }
 
     implicitHeight: Appearance.regaliaEverywhere ? Appearance.regalia.controlHeight : 34
     leftPadding: 15

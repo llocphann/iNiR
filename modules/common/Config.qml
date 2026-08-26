@@ -930,6 +930,7 @@ Singleton {
                     property bool enableVSCode: true
                     property bool enableChrome: true
                     property bool enableSpicetify: false
+                    property string spicetifyTheme: "Inir"
                     property bool enableSteam: false
                     property bool enablePearDesktop: true
                     property bool enableOpenCode: false
@@ -1873,7 +1874,6 @@ Singleton {
                 property JsonObject pill: JsonObject {
                     property bool barMode: false // Rest expanded: the hover row stays out as a persistent bar
                     property real scale: 1 // UI scale multiplier on top of the screen-height ratio
-                    property real opacity: 1 // Pill body fill opacity
                     property real topGap: 1 // Distance from the top edge, in 8px units
                     property real appGap: 1 // How much reserved band the pill keeps below itself
                     property bool showGlyphs: true // 時 kanji instead of a clock icon at rest
@@ -1883,9 +1883,16 @@ Singleton {
                     property bool toasts: true // Notification toasts take over the resting pill
                     property bool osd: true // Volume/brightness/mic/workspace changes flash on the pill
                     property bool compactAnnounces: false // Keep toast/OSD faces at the resting pill size
-                    property real rowSpacing: 20 // Air between the hover row's groups (workspaces | clock | status), px
-                    property real iconSpacing: 12 // Air between the status icons, px
-                    property real iconSize: 17 // Icon size of the pill's furniture, px
+                    property real rowSpacing: 24 // Air between the hover row's groups (workspaces | clock | status), px
+                    property real iconSpacing: 14 // Air between the status icons, px
+                    property real iconSize: 19 // Icon size of the pill's furniture, px
+                    property string batteryDisplay: "both" // "icon" | "percentage" | "both"
+                    property string mediaAccess: "row" // "bud" | "row"
+                    property string superSpaceLauncher: "overview" // "overview" | "pill"
+                    property int mixerAppRows: 5
+                    property int restWidth: 176
+                    property int restHeight: 44
+                    property int expandedHeight: 66
                     // The soul bead that glides between hover targets.
                     property JsonObject soul: JsonObject {
                         property bool enable: true
@@ -1912,6 +1919,7 @@ Singleton {
                         property string mixer: ""
                         property string launcher: ""
                         property string workspaces: ""
+                        property string settings: ""
                     }
                     // Hover-row furniture: every module in the expanded row can be
                     // switched off (surface-bound icons follow surfaces.* instead).
@@ -2066,7 +2074,7 @@ Singleton {
                 property int height: 40 // Bar content height in px (pre-scale). 0 keeps the theme default (40). Range: 24–80.
                 property real opacity: 1.0 // Background opacity (0–1). Lets you make the bar translucent without changing global style.
                 property int cornerStyle: 1 // 0: Hug | 1: Float | 2: Plain rectangle
-                property string appearanceStyle: "classic" // "classic" | "islands" (separate floating groups) | "scenic" (gradient scrim) | "frame" (outlined floating frame) | "m3" (no bar surface; each section is a colLayer0 capsule and each module wears a Material 3 tonal container) | "pill" (morphing centre island, see bar.pill). Horizontal bar only.
+                property string appearanceStyle: "classic" // "classic" | "islands" (separate floating groups; works in both horizontal and vertical bar) | "scenic" (gradient scrim) | "frame" (outlined floating frame) | "m3" (no bar surface; each section is a colLayer0 capsule and each module wears a Material 3 tonal container) | "pill" (morphing centre island, see bar.pill). Horizontal bar only, except islands.
                 property int customRounding: -1 // -1: use global theme rounding | 0+: override bar rounding (px)
                 property bool floatStyleShadow: true // Show shadow behind bar when cornerStyle == 1 (Float)
                 property bool borderless: true // true for no grouping of items

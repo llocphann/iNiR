@@ -369,6 +369,7 @@ ApplicationWindow {
 
         // Expand the section containing the control and collapse others
         if (typeof SettingsSearchRegistry !== "undefined") {
+            SettingsSearchRegistry.activateTaskSectionForControl(control);
             SettingsSearchRegistry.expandSectionForControl(control);
         }
 
@@ -998,7 +999,7 @@ ApplicationWindow {
                                                 }
                                                 color: navBtn.toggled || (Appearance.regaliaEverywhere && navBtn.buttonHovered)
                                                     ? (Appearance.regaliaEverywhere
-                                                        ? Appearance.regalia.onPrimaryPlate
+                                                        ? Appearance.regalia.primaryPlateInk
                                                         : Appearance.colors.colOnLayer1)
                                                     : Appearance.colors.colOnSurfaceVariant
                                                 elide: Text.ElideRight

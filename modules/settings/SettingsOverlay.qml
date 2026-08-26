@@ -305,6 +305,7 @@ Scope {
 
         // Expand the section containing the control and collapse others
         if (typeof SettingsSearchRegistry !== "undefined") {
+            SettingsSearchRegistry.activateTaskSectionForControl(control);
             SettingsSearchRegistry.expandSectionForControl(control);
         }
 

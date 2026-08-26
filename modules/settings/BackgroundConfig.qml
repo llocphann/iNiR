@@ -15,6 +15,24 @@ ContentPage {
     settingsPageName: Translation.tr("Background")
 
     property bool isIiActive: Config.options?.panelFamily !== "waffle"
+    property string activeSection: "source"
+
+    SettingsTaskNavigator {
+        visible: root.isIiActive
+        icon: "texture"
+        title: Translation.tr("Wallpaper")
+        description: Translation.tr("Choose the source and rotation first, then tune motion, screen behavior or visual effects without scrolling through unrelated controls.")
+        summary: Translation.tr("Source · motion · screens · effects · notifications")
+        currentValue: root.activeSection
+        onSelected: value => root.activeSection = value
+        options: [
+            { displayName: Translation.tr("Source"), icon: "wallpaper", value: "source" },
+            { displayName: Translation.tr("Motion"), icon: "transition_fade", value: "motion" },
+            { displayName: Translation.tr("Screens"), icon: "devices", value: "screens" },
+            { displayName: Translation.tr("Effects"), icon: "auto_awesome", value: "effects" },
+            { displayName: Translation.tr("Notifications"), icon: "notifications", value: "notifications" }
+        ]
+    }
     readonly property var iiParallax: Config.options?.background?.parallax ?? {}
     readonly property string iiParallaxPreset: ParallaxMath.detectPreset(
         iiParallax.zoom ?? iiParallax.workspaceZoom ?? 1.0,
@@ -58,8 +76,9 @@ ContentPage {
     }
 
     SettingsCardSection {
-        visible: root.isIiActive
-        expanded: false
+        settingsTaskSection: "motion"
+        visible: root.isIiActive && root.activeSection === "motion"
+        expanded: true
         icon: "sync_alt"
         title: Translation.tr("Parallax")
 
@@ -209,8 +228,9 @@ ContentPage {
     }
 
     SettingsCardSection {
-        visible: root.isIiActive
-        expanded: false
+        settingsTaskSection: "screens"
+        visible: root.isIiActive && root.activeSection === "screens"
+        expanded: true
         icon: "fullscreen"
         title: Translation.tr("Fullscreen behavior")
 
@@ -236,8 +256,9 @@ ContentPage {
     }
 
     SettingsCardSection {
-        visible: root.isIiActive
-        expanded: false
+        settingsTaskSection: "screens"
+        visible: root.isIiActive && root.activeSection === "screens"
+        expanded: true
         icon: "devices"
         title: Translation.tr("Multi-monitor")
 
@@ -1066,7 +1087,9 @@ ContentPage {
     }
 
     SettingsCardSection {
-        expanded: false
+        settingsTaskSection: "source"
+        visible: !root.isIiActive || root.activeSection === "source"
+        expanded: true
         icon: "wallpaper"
         title: Translation.tr("Wallpaper backend (awww)")
 
@@ -1123,7 +1146,9 @@ ContentPage {
     }
 
     SettingsCardSection {
-        expanded: false
+        settingsTaskSection: "source"
+        visible: !root.isIiActive || root.activeSection === "source"
+        expanded: true
         icon: "folder"
         title: Translation.tr("Wallpapers folder")
 
@@ -1143,7 +1168,9 @@ ContentPage {
     }
 
     SettingsCardSection {
-        expanded: false
+        settingsTaskSection: "source"
+        visible: !root.isIiActive || root.activeSection === "source"
+        expanded: true
         icon: "shuffle"
         title: Translation.tr("Shuffle wallpapers")
 
@@ -1199,8 +1226,9 @@ ContentPage {
     }
 
     SettingsCardSection {
-        visible: root.isIiActive
-        expanded: false
+        settingsTaskSection: "motion"
+        visible: root.isIiActive && root.activeSection === "motion"
+        expanded: true
         icon: "transition_fade"
         title: Translation.tr("Wallpaper transitions")
 
@@ -1341,8 +1369,9 @@ ContentPage {
     }
 
     SettingsCardSection {
-        visible: root.isIiActive
-        expanded: false
+        settingsTaskSection: "screens"
+        visible: root.isIiActive && root.activeSection === "screens"
+        expanded: true
         icon: "aspect_ratio"
         title: Translation.tr("Wallpaper scaling")
 
@@ -1708,8 +1737,9 @@ ContentPage {
     }
 
     SettingsCardSection {
-        visible: root.isIiActive
-        expanded: false
+        settingsTaskSection: "effects"
+        visible: root.isIiActive && root.activeSection === "effects"
+        expanded: true
         icon: "wallpaper"
         title: Translation.tr("Wallpaper effects")
 
@@ -2196,7 +2226,9 @@ ContentPage {
     // Desktop widget settings moved to DesktopWidgetsConfig.qml (settingsPageIndex: 14)
 
     SettingsCardSection {
-        expanded: false
+        settingsTaskSection: "notifications"
+        visible: !root.isIiActive || root.activeSection === "notifications"
+        expanded: true
         icon: "notifications"
         title: Translation.tr("Notifications")
 
