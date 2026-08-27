@@ -1421,6 +1421,7 @@ Singleton {
                         property bool showMemory: true
                         property bool showGpu: true
                         property bool showTemp: false
+                        property bool showGpuTemp: false
                         property bool showDisk: false
                         property bool showLabels: true
                         property int contentWidth: 320
@@ -1873,6 +1874,7 @@ Singleton {
                 // island that replaces the bar and grows on hover.
                 property JsonObject pill: JsonObject {
                     property bool barMode: false // Rest expanded: the hover row stays out as a persistent bar
+                    property bool floatOverWindows: false // Keep the visible Pill over normal windows instead of reserving the top edge
                     property real scale: 1 // UI scale multiplier on top of the screen-height ratio
                     property real topGap: 1 // Distance from the top edge, in 8px units
                     property real appGap: 1 // How much reserved band the pill keeps below itself

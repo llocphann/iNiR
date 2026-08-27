@@ -930,18 +930,25 @@ Singleton {
 			.filter(token => token.length >= 3);
 	}
 
-	function _streamMatchScore(player: MprisPlayer, node): int {
-		if (!player || !node) return 0;
+	// Returns {identity, total}. `identity` is the real name/title overlap
+	// between player and PipeWire stream node; `total` adds a running/idle
+	// state bonus used only as a tiebreaker among identity-matched candidates.
+	// The state bonus MUST NOT contribute to the match threshold on its own:
+	// otherwise every running stream matches the only running MPRIS player
+	// (e.g. a browser tab) and the mixer labels every app with that player's
+	// desktop entry name.
+	function _streamMatchScore(player: MprisPlayer, node): var {
+		if (!player || !node) return {identity: 0, total: 0};
 		const props = node.properties ?? {};
 		const meta = root._streamMetadataById[Number(node.id ?? 0)] ?? {};
 		const mediaName = String(meta.mediaName ?? props["media.name"] ?? "");
 		const title = String(player.trackTitle ?? "");
 		const titleKey = root._volumeKey(title);
 		const mediaKey = root._volumeKey(mediaName);
-		let score = meta.state === "running" ? 20 : (meta.state === "idle" ? -20 : 0);
+		let identity = 0;
 		if (titleKey.length >= 4 && mediaKey.length >= 4) {
-			if (titleKey === mediaKey) score += 120;
-			else if (titleKey.includes(mediaKey) || mediaKey.includes(titleKey)) score += 80;
+			if (titleKey === mediaKey) identity += 120;
+			else if (titleKey.includes(mediaKey) || mediaKey.includes(titleKey)) identity += 80;
 		}
 
 		const playerValues = [
@@ -978,37 +985,40 @@ Singleton {
 				for (const token of pt) if (nt.includes(token)) overlap++;
 				if (overlap > 0) candidateScore = Math.max(candidateScore, overlap * 12);
 			}
-			score += candidateScore;
+			identity += candidateScore;
 		}
-		return score;
+		const stateBonus = meta.state === "running" ? 20 : (meta.state === "idle" ? -20 : 0);
+		return {identity: identity, total: identity + stateBonus};
 	}
 
 	function streamNodeForPlayer(player: MprisPlayer): var {
 		if (!player) return null;
 		let best = null;
-		let bestScore = 0;
+		let bestTotal = 0;
 		for (const node of Audio.outputAppNodes ?? []) {
-			const score = root._streamMatchScore(player, node);
-			if (score > bestScore) {
-				bestScore = score;
+			const s = root._streamMatchScore(player, node);
+			// Require real identity overlap; rank by total so the running-state
+			// tiebreaker only decides between already-matched candidates.
+			if (s.identity >= 12 && (best === null || s.total > bestTotal)) {
+				bestTotal = s.total;
 				best = node;
 			}
 		}
-		return bestScore >= 12 ? best : null;
+		return best;
 	}
 
 	function playerForStreamNode(node): MprisPlayer {
 		if (!node) return null;
 		let best = null;
-		let bestScore = 0;
+		let bestTotal = 0;
 		for (const player of root.displayPlayers ?? []) {
-			const score = root._streamMatchScore(player, node);
-			if (score > bestScore) {
-				bestScore = score;
+			const s = root._streamMatchScore(player, node);
+			if (s.identity >= 12 && (best === null || s.total > bestTotal)) {
+				bestTotal = s.total;
 				best = player;
 			}
 		}
-		return bestScore >= 12 ? best : null;
+		return best;
 	}
 
 	function _serviceNameFromUrl(value): string {
@@ -1150,16 +1160,20 @@ Singleton {
 	readonly property real volume: {
 		if (root.isYtMusicActive && YtMusic.currentVideoId)
 			return YtMusic.getVolume();
-		if (root.activePlayer && root.activePlayer.volumeSupported && root.activePlayer.canControl)
-			return Math.max(0, Math.min(1, root.activePlayer.volume));
+		// Per-stream PipeWire volume is the real per-app loudness the mixer
+		// shows and the user hears. Read it first so the bar/pill slider
+		// tracks the stream, not the player's MPRIS volume (which browser
+		// bridges often don't propagate to the active tab's stream).
 		const nodeVolume = root.activePlayerStreamNode?.audio?.volume;
 		if (nodeVolume !== undefined && nodeVolume !== null)
 			return Math.max(0, Math.min(1, nodeVolume));
+		if (root.activePlayer && root.activePlayer.volumeSupported && root.activePlayer.canControl)
+			return Math.max(0, Math.min(1, root.activePlayer.volume));
 		return 0;
 	}
 	readonly property bool canChangeVolume: (root.isYtMusicActive && YtMusic.currentVideoId)
-		|| !!(root.activePlayer && root.activePlayer.volumeSupported && root.activePlayer.canControl)
-		|| !!root.activePlayerStreamNode?.audio;
+		|| !!root.activePlayerStreamNode?.audio
+		|| !!(root.activePlayer && root.activePlayer.volumeSupported && root.activePlayer.canControl);
 
 	function getVolume(): real {
 		return root.volume;
@@ -1171,16 +1185,21 @@ Singleton {
 			YtMusic.setVolume(clamped);
 			return;
 		}
-		if (root.activePlayer && root.activePlayer.volumeSupported && root.activePlayer.canControl) {
-			root.activePlayer.volume = clamped;
-			return;
-		}
+		// Stream node first: write node.audio.volume for immediate UI binding
+		// feedback and real per-app PipeWire change, with wpctl as a backing
+		// hammer. MPRIS volume is only a fallback when no stream matches,
+		// because browser bridges report volumeSupported but rarely move the
+		// active tab's per-stream volume.
 		const node = root.activePlayerStreamNode;
 		if (node?.audio) {
+			node.audio.volume = clamped;
 			const nodeId = Number(node.id ?? 0);
 			if (Number.isFinite(nodeId) && nodeId > 0)
 				Quickshell.execDetached(["wpctl", "set-volume", String(nodeId), String(clamped)]);
+			return;
 		}
+		if (root.activePlayer && root.activePlayer.volumeSupported && root.activePlayer.canControl)
+			root.activePlayer.volume = clamped;
 	}
 
 	property bool loopSupported: this.activePlayer && this.activePlayer.loopSupported && this.activePlayer.canControl;

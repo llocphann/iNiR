@@ -14,9 +14,11 @@ A polish release for Pill controls and surfaces, settings navigation, TUI app th
 ### Added
 - **TUI app themes**: Discord/Vesktop gains an iNiR TUI flavor on top of System24, and Spotify gains an `InirTUI` Spicetify flavor based on the upstream `text` theme. Settings can switch Spotify between Sleek and TUI while preserving wallpaper-driven iNiR colors; Text receives semantic iNiR accent/border/header/highlight roles and readable playback-control contrast without forking its layout.
 - **Pill controls and app mixer**: battery display can use icon, percentage or both; Now Playing gets a wide hover-row capsule with wheel volume control instead of relying on the tiny side bud; monitor-aware sizing plus roomier calendar/weather, launcher, tray, workspace and shared search controls improve 1080p+ usability; Super+Space can open either iNiR Overview or the Pill launcher; a Ricelin settings index links directly into iNiR settings pages; and Mixer uses Ricelin-style vertical output/app faders with resolved desktop-entry names/icons, wheel volume, mute controls, a horizontally scrollable app rail, and a separate System view.
+- **Floating Pill**: Pill can remain visible and hover-expand above normal windows without reserving the top edge. Fullscreen still hides and unmaps the overlay to preserve game performance.
 
 ### Changed
 - **Pill and Ricelin settings**: Pill setup is now grouped by interaction, readability, surfaces, hover row, clock/glyphs and advanced geometry with a live shape preview; Pill and every Ricelin Island surface now consume one body-opacity/glass material with shared blur, radius, shadow and sheen, including nested PanelSurface consumers.
+- **Pill sizing**: Scale now honors values below the monitor readability presets, and the previously working compact width, height, icon and spacing ranges are available again without changing the current defaults.
 - **Settings navigation**: dense multi-purpose pages use task-oriented sections, and search activates the owning section before focusing a result across standalone and overlay hosts.
 
 ### Fixed

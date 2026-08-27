@@ -16,7 +16,7 @@ TextArea {
     Material.background: Appearance.regaliaEverywhere ? "transparent" : Appearance.colors.colLayer1
     Material.foreground: Appearance.regaliaEverywhere ? Appearance.regalia.onColor : Appearance.colors.colOnSurface
     Material.containerStyle: Material.Filled
-    renderType: Text.NativeRendering
+    renderType: Text.QtRendering
 
     // Integración con buscador global de Settings
     property bool enableSettingsSearch: true
@@ -86,7 +86,7 @@ TextArea {
 
     selectedTextColor: Appearance.regaliaEverywhere ? Appearance.regalia.primaryPlateInk : Appearance.colors.colOnSecondaryContainer
     selectionColor: Appearance.regaliaEverywhere ? Appearance.regalia.primaryPlate : Appearance.colors.colSecondaryContainer
-    placeholderTextColor: Appearance.regaliaEverywhere ? Appearance.regalia.onMuted : Appearance.colors.colOutline
+    placeholderTextColor: Appearance.regaliaEverywhere ? Appearance.regalia.onMuted : Appearance.colors.colOnLayer1
 
     background: Item {
         implicitHeight: 56
@@ -127,8 +127,8 @@ TextArea {
 
     font {
         family: Appearance.font.family.main
-        pixelSize: Appearance?.font.pixelSize.small ?? 15
-        hintingPreference: Font.PreferFullHinting
+        pixelSize: Appearance?.font.pixelSize.normal ?? 16
+        hintingPreference: Font.PreferNoHinting
         variableAxes: Appearance.font.variableAxes.main
     }
     wrapMode: TextEdit.Wrap

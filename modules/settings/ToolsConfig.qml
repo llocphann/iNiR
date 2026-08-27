@@ -880,8 +880,8 @@ ContentPage {
             RowLayout {
                 StyledText {
                     Layout.leftMargin: 10
-                    color: Appearance.colors.colSubtext
-                    font.pixelSize: Appearance.font.pixelSize.smallie
+                    color: Appearance.colors.colOnLayer1
+                    font.pixelSize: Appearance.font.pixelSize.small
                     text: Translation.tr("Floating tools (Super+G)")
                 }
                 Item {

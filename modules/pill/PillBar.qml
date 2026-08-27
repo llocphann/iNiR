@@ -35,12 +35,11 @@ Scope {
 
     function scaleForScreen(screen): real {
         if (!screen)
-            return root.uiScale
+            return Math.max(0.6, root.uiScale)
         const shortEdge = Math.min(screen.width, screen.height)
         const resolutionScale = Math.max(0.78, Math.min(1.6, shortEdge / 1080))
         const requested = resolutionScale * 1.1 * root.uiScale
-        const usabilityFloor = shortEdge >= 1000 ? 1.0 : shortEdge >= 800 ? 0.9 : 0.8
-        return Math.max(usabilityFloor, requested)
+        return Math.max(0.6, requested)
     }
 
     function setAutoHideShown(screenName: string, shown: bool): void {
@@ -126,6 +125,8 @@ Scope {
     readonly property real uiScale: Config.options?.bar?.pill?.scale ?? 1
     readonly property real topGap: Config.options?.bar?.pill?.topGap ?? 1
     readonly property real appGap: Config.options?.bar?.pill?.appGap ?? 1
+    readonly property bool floatOverWindows:
+        Config.options?.bar?.pill?.floatOverWindows ?? false
 
     function openTrayMenu(item, anchorX, hostWindow) {
         trayMenu.s = hostWindow ? hostWindow.s : 1;
@@ -152,8 +153,8 @@ Scope {
             readonly property real s: root.scaleForScreen(modelData)
             readonly property real topGapPx: 8 * root.topGap * s
             readonly property real restHeight: (Config.options?.bar?.pill?.barMode ?? false)
-                ? Math.max(66, Config.options?.bar?.pill?.expandedHeight ?? 66) * s
-                : Math.max(44, Config.options?.bar?.pill?.restHeight ?? 44) * s
+                ? Math.max(58, Config.options?.bar?.pill?.expandedHeight ?? 66) * s
+                : Math.max(38, Config.options?.bar?.pill?.restHeight ?? 44) * s
             readonly property real gameBarH: 34 * s
 
             /**
@@ -205,7 +206,7 @@ Scope {
                 : useGameZone ? gameBarH
                 : autoHideEnabled
                     ? ((Config.options?.bar?.autoHide?.pushWindows ?? false) && autoHideShown ? reservedH : 0)
-                    : reservedH
+                    : root.floatOverWindows ? 0 : reservedH
             aboveWindows: true
 
             anchors { top: true; left: true; right: true }
@@ -415,7 +416,7 @@ Scope {
 
                 Pill {
                     id: pill
-                    s: overlay.s
+                    s: overlay.surfaceOpen ? Math.max(1, overlay.s) : overlay.s
                     screenName: overlay.modelData ? overlay.modelData.name : ""
                     barWindow: overlay
                     surface: overlay.surface

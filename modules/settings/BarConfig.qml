@@ -13,6 +13,26 @@ ContentPage {
     settingsPageName: Translation.tr("Bar")
 
     property bool isIiActive: Config.options?.panelFamily !== "waffle"
+    property string activeSection: "appearance"
+
+    SettingsTaskNavigator {
+        icon: "toolbar"
+        title: Translation.tr("Bar")
+        description: Translation.tr("Position and sizing, the bar surface styles, and the widgets and modules that live in the bar.")
+        summary: Translation.tr("Shape · M3 · Islands · Spectrum · Behavior · Modules")
+        currentValue: root.activeSection
+        onSelected: value => root.activeSection = value
+        options: [
+            { displayName: Translation.tr("Shape & position"), icon: "style", value: "appearance" },
+            { displayName: Translation.tr("M3 bar"), icon: "category", value: "m3",
+              dimmed: (Config.options?.bar?.appearanceStyle ?? "classic") !== "m3" },
+            { displayName: Translation.tr("Islands"), icon: "linear_scale", value: "islands",
+              dimmed: (Config.options?.bar?.appearanceStyle ?? "classic") !== "islands" },
+            { displayName: Translation.tr("Audio spectrum"), icon: "graphic_eq", value: "spectrum" },
+            { displayName: Translation.tr("Behavior & clock"), icon: "visibility", value: "behavior" },
+            { displayName: Translation.tr("Modules"), icon: "widgets", value: "modules" }
+        ]
+    }
     property bool m3ControlsReady: false
     property bool spectrumControlsReady: false
     Component.onCompleted: Qt.callLater(() => {
@@ -287,12 +307,70 @@ ContentPage {
     // APPEARANCE & LAYOUT
     // ═══════════════════════════════════════════════════════════════════
     SettingsCardSection {
-        visible: root.isIiActive
+        settingsTaskSection: "appearance"
+        visible: root.isIiActive && root.activeSection === "appearance"
         expanded: true
         icon: "dashboard"
         title: Translation.tr("Appearance & Layout")
 
         SettingsGroup {
+            ContentSubsection {
+                title: Translation.tr("Bar appearance")
+
+                ConfigSelectionArray {
+                    currentValue: Config.options?.bar?.appearanceStyle ?? "classic"
+                    onSelected: newValue => {
+                        Config.setNestedValue("bar.appearanceStyle", newValue);
+                    }
+                    options: [
+                        { displayName: Translation.tr("Classic"), icon: "toolbar", value: "classic" },
+                        { displayName: Translation.tr("Islands"), icon: "linear_scale", value: "islands" },
+                        { displayName: Translation.tr("Scenic"), icon: "gradient", value: "scenic" },
+                        { displayName: Translation.tr("Frame"), icon: "crop_free", value: "frame" },
+                        { displayName: Translation.tr("M3"), icon: "category", value: "m3" },
+                        { displayName: Translation.tr("Pill"), icon: "blur_on", value: "pill" }
+                    ]
+                }
+
+                SettingsNote {
+                    icon: "toolbar"
+                    text: Translation.tr("Decides the bar surface style. Islands works in horizontal and vertical bars; the rest are horizontal only.")
+                }
+
+                RippleButton {
+                    visible: (Config.options?.bar?.appearanceStyle ?? "classic") === "pill"
+                    Layout.fillWidth: true
+                    implicitHeight: 40
+                    buttonRadius: Appearance.rounding.small
+                    colBackground: Appearance.colors.colLayer1
+                    colBackgroundHover: Appearance.colors.colLayer1Hover
+                    onClicked: GlobalStates.openSettingsPage(21)
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 10
+                        anchors.rightMargin: 10
+                        spacing: 8
+                        MaterialSymbol {
+                            text: "tune"
+                            iconSize: 18
+                            color: Appearance.colors.colPrimary
+                        }
+                        StyledText {
+                            Layout.fillWidth: true
+                            text: Translation.tr("Open Ricelin Pill settings")
+                            font.pixelSize: Appearance.font.pixelSize.small
+                            font.weight: Font.Medium
+                        }
+                        MaterialSymbol {
+                            text: "chevron_right"
+                            iconSize: 18
+                            color: Appearance.colors.colSubtext
+                        }
+                    }
+                }
+            }
+
             ConfigRow {
                 uniform: true
 
@@ -344,60 +422,48 @@ ContentPage {
                     }
                 }
             }
+        }
+    }
 
-            ContentSubsection {
-                title: Translation.tr("Bar appearance")
+    SettingsCardSection {
+        settingsTaskSection: "m3"
+        visible: root.isIiActive && root.activeSection === "m3"
+        expanded: true
+        icon: "category"
+        title: Translation.tr("M3 Bar")
 
-                ConfigSelectionArray {
-                    currentValue: Config.options?.bar?.appearanceStyle ?? "classic"
-                    onSelected: newValue => {
-                        Config.setNestedValue("bar.appearanceStyle", newValue);
+        SettingsGroup {
+
+            SettingsNote {
+                visible: (Config.options?.bar?.appearanceStyle ?? "classic") !== "m3"
+                icon: "info"
+                text: Translation.tr("These options configure the M3 bar and take effect when M3 is the active bar appearance.")
+            }
+
+            RippleButton {
+                visible: (Config.options?.bar?.appearanceStyle ?? "classic") !== "m3"
+                Layout.fillWidth: true
+                implicitHeight: 40
+                buttonRadius: Appearance.rounding.small
+                colBackground: Appearance.colors.colLayer1
+                colBackgroundHover: Appearance.colors.colLayer1Hover
+                onClicked: Config.setNestedValue("bar.appearanceStyle", "m3")
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 10
+                    anchors.rightMargin: 10
+                    spacing: 8
+                    MaterialSymbol {
+                        text: "category"
+                        iconSize: 18
+                        color: Appearance.colors.colPrimary
                     }
-                    options: [
-                        { displayName: Translation.tr("Classic"), icon: "toolbar", value: "classic" },
-                        { displayName: Translation.tr("Islands"), icon: "linear_scale", value: "islands" },
-                        { displayName: Translation.tr("Scenic"), icon: "gradient", value: "scenic" },
-                        { displayName: Translation.tr("Frame"), icon: "crop_free", value: "frame" },
-                        { displayName: Translation.tr("M3"), icon: "category", value: "m3" },
-                        { displayName: Translation.tr("Pill"), icon: "blur_on", value: "pill" }
-                    ]
-                }
-
-                SettingsNote {
-                    icon: "toolbar"
-                    text: Translation.tr("Redraws the bar surface. Islands works in both horizontal and vertical bars; other appearances are horizontal only.")
-                }
-
-                RippleButton {
-                    visible: (Config.options?.bar?.appearanceStyle ?? "classic") === "pill"
-                    Layout.fillWidth: true
-                    implicitHeight: 40
-                    buttonRadius: Appearance.rounding.small
-                    colBackground: Appearance.colors.colLayer1
-                    colBackgroundHover: Appearance.colors.colLayer1Hover
-                    onClicked: GlobalStates.openSettingsPage(21)
-
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.leftMargin: 10
-                        anchors.rightMargin: 10
-                        spacing: 8
-                        MaterialSymbol {
-                            text: "tune"
-                            iconSize: 18
-                            color: Appearance.colors.colPrimary
-                        }
-                        StyledText {
-                            Layout.fillWidth: true
-                            text: Translation.tr("Open Ricelin Pill settings")
-                            font.pixelSize: Appearance.font.pixelSize.small
-                            font.weight: Font.Medium
-                        }
-                        MaterialSymbol {
-                            text: "chevron_right"
-                            iconSize: 18
-                            color: Appearance.colors.colSubtext
-                        }
+                    StyledText {
+                        Layout.fillWidth: true
+                        text: Translation.tr("Switch the bar to M3 appearance")
+                        font.pixelSize: Appearance.font.pixelSize.small
+                        font.weight: Font.Medium
                     }
                 }
             }
@@ -1045,7 +1111,51 @@ ContentPage {
                         }
                     }
                 }
+            }
+        }
+    }
 
+    SettingsCardSection {
+        settingsTaskSection: "islands"
+        visible: root.isIiActive && root.activeSection === "islands"
+        expanded: true
+        icon: "linear_scale"
+        title: Translation.tr("Islands options")
+
+        SettingsGroup {
+
+            SettingsNote {
+                visible: (Config.options?.bar?.appearanceStyle ?? "classic") !== "islands"
+                icon: "info"
+                text: Translation.tr("Islands is not the active bar appearance. Switch to it to see these geometry changes live.")
+            }
+
+            RippleButton {
+                visible: (Config.options?.bar?.appearanceStyle ?? "classic") !== "islands"
+                Layout.fillWidth: true
+                implicitHeight: 40
+                buttonRadius: Appearance.rounding.small
+                colBackground: Appearance.colors.colLayer1
+                colBackgroundHover: Appearance.colors.colLayer1Hover
+                onClicked: Config.setNestedValue("bar.appearanceStyle", "islands")
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 10
+                    anchors.rightMargin: 10
+                    spacing: 8
+                    MaterialSymbol {
+                        text: "linear_scale"
+                        iconSize: 18
+                        color: Appearance.colors.colPrimary
+                    }
+                    StyledText {
+                        Layout.fillWidth: true
+                        text: Translation.tr("Switch the bar to Islands appearance")
+                        font.pixelSize: Appearance.font.pixelSize.small
+                        font.weight: Font.Medium
+                    }
+                }
             }
 
             ContentSubsection {
@@ -1088,6 +1198,17 @@ ContentPage {
                     wrapMode: Text.WordWrap
                 }
             }
+        }
+    }
+
+    SettingsCardSection {
+        settingsTaskSection: "appearance"
+        visible: root.isIiActive && root.activeSection === "appearance"
+        expanded: true
+        icon: "straighten"
+        title: Translation.tr("Sizing & surface")
+
+        SettingsGroup {
 
             // Corner style conflict notes
             SettingsNote {
@@ -1173,8 +1294,17 @@ ContentPage {
                 text: Translation.tr("Opacity has no effect while ‘Show background’ is off.")
             }
 
-            SettingsDivider {}
+        }
+    }
 
+    SettingsCardSection {
+        settingsTaskSection: "spectrum"
+        visible: root.isIiActive && root.activeSection === "spectrum"
+        expanded: false
+        icon: "graphic_eq"
+        title: Translation.tr("Audio spectrum")
+
+        SettingsGroup {
             ContentSubsection {
                 title: Translation.tr("Audio spectrum")
 
@@ -1498,8 +1628,17 @@ ContentPage {
                     text: Translation.tr("The spectrum needs a visible bar surface, so it is hidden while the background is off.")
                 }
             }
+        }
+    }
 
-            SettingsDivider {}
+    SettingsCardSection {
+        settingsTaskSection: "behavior"
+        visible: root.isIiActive && root.activeSection === "behavior"
+        expanded: true
+        icon: "visibility"
+        title: Translation.tr("Behavior & clock")
+
+        SettingsGroup {
 
             ConfigRow {
                 uniform: true
@@ -1866,7 +2005,8 @@ ContentPage {
     // MODULES (what to show)
     // ═══════════════════════════════════════════════════════════════════
     SettingsCardSection {
-        visible: root.isIiActive
+        settingsTaskSection: "modules"
+        visible: root.isIiActive && root.activeSection === "modules"
         expanded: false
         icon: "widgets"
         title: Translation.tr("Modules")
@@ -2056,7 +2196,8 @@ ContentPage {
     // MODULE LAYOUT (reorder / relocate)
     // ═══════════════════════════════════════════════════════════════════
     SettingsCardSection {
-        visible: root.isIiActive
+        settingsTaskSection: "modules"
+        visible: root.isIiActive && root.activeSection === "modules"
         expanded: false
         icon: "reorder"
         title: Translation.tr("Bar module layout")
@@ -2093,7 +2234,8 @@ ContentPage {
     // RESOURCES
     // ═══════════════════════════════════════════════════════════════════
     SettingsCardSection {
-        visible: root.isIiActive && !(Config.options?.settingsUi?.easyMode ?? false)
+        settingsTaskSection: "modules"
+        visible: root.isIiActive && !(Config.options?.settingsUi?.easyMode ?? false) && root.activeSection === "modules"
         expanded: false
         icon: "browse_activity"
         title: Translation.tr("Resources")
@@ -2252,7 +2394,8 @@ ContentPage {
     // MEDIA
     // ═══════════════════════════════════════════════════════════════════
     SettingsCardSection {
-        visible: root.isIiActive
+        settingsTaskSection: "modules"
+        visible: root.isIiActive && root.activeSection === "modules"
         expanded: false
         icon: "music_note"
         title: Translation.tr("Media")
@@ -2286,7 +2429,8 @@ ContentPage {
     // WORKSPACES
     // ═══════════════════════════════════════════════════════════════════
     SettingsCardSection {
-        visible: root.isIiActive && !(Config.options?.settingsUi?.easyMode ?? false)
+        settingsTaskSection: "modules"
+        visible: root.isIiActive && !(Config.options?.settingsUi?.easyMode ?? false) && root.activeSection === "modules"
         expanded: false
         icon: "workspaces"
         title: Translation.tr("Workspaces")
@@ -2519,7 +2663,8 @@ ContentPage {
     // SYSTEM TRAY
     // ═══════════════════════════════════════════════════════════════════
     SettingsCardSection {
-        visible: root.isIiActive
+        settingsTaskSection: "modules"
+        visible: root.isIiActive && root.activeSection === "modules"
         expanded: false
         icon: "shelf_auto_hide"
         title: Translation.tr("System Tray")
@@ -2568,7 +2713,8 @@ ContentPage {
     // UTILITY BUTTONS
     // ═══════════════════════════════════════════════════════════════════
     SettingsCardSection {
-        visible: root.isIiActive
+        settingsTaskSection: "modules"
+        visible: root.isIiActive && root.activeSection === "modules"
         expanded: false
         icon: "build"
         title: Translation.tr("Utility Buttons")
@@ -2707,7 +2853,8 @@ ContentPage {
     // NOTIFICATIONS
     // ═══════════════════════════════════════════════════════════════════
     SettingsCardSection {
-        visible: root.isIiActive
+        settingsTaskSection: "modules"
+        visible: root.isIiActive && root.activeSection === "modules"
         expanded: false
         icon: "notifications"
         title: Translation.tr("Notifications")

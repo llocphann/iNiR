@@ -199,7 +199,7 @@ ShellRoot {
                 deferred: Math.floor(root._bootDeferredAt - root._bootShellEntryAt),
                 lateFeatures: Math.floor(root._bootLateFeaturesAt - root._bootDeferredAt)
             },
-            shellPid: 0,
+            shellPid: Quickshell.processId,
             writtenAt: Math.floor(Date.now())
         };
         bootPhaseWriter.setText(JSON.stringify(data, null, 2));

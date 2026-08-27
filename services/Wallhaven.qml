@@ -82,6 +82,11 @@ QtObject {
     property int minSearchIntervalMs: 1200
     property int minTagIntervalMs: 1200
     property real _nextSearchAllowedMs: 0
+
+    property Timer _pendingSearchTimer: Timer {
+        interval: Math.max(0, root._nextSearchAllowedMs - root.nowMs)
+        onTriggered: root._processPendingSearch()
+    }
     property real _nextTagAllowedMs: 0
 
     // Pending search request (coalesced)
@@ -567,7 +572,7 @@ QtObject {
     }
 
     // Config-driven options
-    property string apiKey: Config.options?.sidebar?.wallhaven?.apiKey ?? ""
+    property string apiKey: (Config.options?.sidebar?.wallhaven?.apiKey ?? "").trim()
     property int defaultLimit: Config.options?.sidebar?.wallhaven?.limit ?? 24
     property bool allowNsfw: Persistent.states?.booru?.allowNsfw ?? false
     property string sortingMode: "toplist"
@@ -637,11 +642,19 @@ QtObject {
         }
         params.push("purity=" + purity)
 
+        // Wallhaven's toplist+query only returns the week's hot posts for the tag
+        // (tiny, unpageable sets). Tag searches use the API's default relevance
+        // ordering; toplist applies to tagless browsing.
+        const hasTags = q.length > 0
         var sorting = sortingMode
-        params.push("sorting=" + sorting)
-        params.push("order=desc")
-        if (sorting === "toplist" && topRange.length > 0) {
-            params.push("topRange=" + topRange)
+        if (hasTags && sorting === "toplist")
+            sorting = "relevance"
+        if (sorting !== "relevance")
+            params.push("sorting=" + sorting)
+        if (sorting === "toplist") {
+            params.push("order=desc")
+            if (topRange.length > 0)
+                params.push("topRange=" + topRange)
         }
 
         if (apiKey && apiKey.length > 0) {
@@ -694,6 +707,10 @@ QtObject {
                 provider: requestedProvider,
                 fitProfile: requestedFit
             }
+            // Without an in-flight response to trigger _processPendingSearch,
+            // a throttled search would stay queued forever.
+            if (runningRequests <= 0)
+                root._pendingSearchTimer.restart()
             return
         }
 
@@ -765,6 +782,18 @@ QtObject {
             let images = []
             if (root._currentSearchProvider === "wallhaven") {
                 var payload = JSON.parse(text)
+                if (payload && payload.error) {
+                    const apiError = String(payload.error)
+                    newResponse.message = apiError.toLowerCase().includes("unauthor")
+                        ? Translation.tr("Wallhaven rejected your API key. Check the key in settings and that your account allows NSFW.")
+                        : Translation.tr("Wallhaven API error: %1").arg(apiError)
+                    console.log("[Wallhaven] API error:", apiError)
+                    root._appendResponse(newResponse)
+                    root.responseFinished()
+                    root._currentSearchResponse = null
+                    root._processPendingSearch()
+                    return
+                }
                 var list = payload.data || []
                 images = list.map(function(item) {
                     var path = item.path || ""
@@ -866,7 +895,12 @@ QtObject {
             if (images.length > root._currentSearchDisplayLimit)
                 images = images.slice(0, root._currentSearchDisplayLimit)
             newResponse.images = images
-            newResponse.message = images.length > 0 ? "" : failMessage
+            if (images.length > 0)
+                newResponse.message = ""
+            else if ((newResponse.page || 1) > 1)
+                newResponse.message = Translation.tr("No more results for this search.")
+            else
+                newResponse.message = Translation.tr("No wallpapers found for these tags and filters.")
         } catch (e) {
             console.log("[Wallhaven] Failed to parse response:", e)
             newResponse.message = failMessage

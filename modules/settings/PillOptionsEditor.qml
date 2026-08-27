@@ -98,9 +98,8 @@ ColumnLayout {
                     StyledText {
                         Layout.fillWidth: true
                         text: Translation.tr("Configure the controls you use first, then tune scale and spacing. Rare geometry stays out of the way under Advanced.")
-                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        font.pixelSize: Appearance.font.pixelSize.small
                         color: Appearance.colors.colOnPrimaryContainer
-                        opacity: 0.82
                         wrapMode: Text.WordWrap
                     }
                 }
@@ -109,10 +108,9 @@ ColumnLayout {
             StyledText {
                 Layout.fillWidth: true
                 text: Translation.tr("Behavior · readability · surfaces")
-                font.pixelSize: Appearance.font.pixelSize.smallest
+                font.pixelSize: Appearance.font.pixelSize.small
                 font.weight: Font.Medium
                 color: Appearance.colors.colOnPrimaryContainer
-                opacity: 0.78
                 wrapMode: Text.WordWrap
             }
         }
@@ -145,50 +143,53 @@ ColumnLayout {
                 }
                 StyledText {
                     text: Math.round((Config.options?.bar?.pill?.scale ?? 1) * 100) + "%"
-                    color: Appearance.colors.colSubtext
-                    font.pixelSize: Appearance.font.pixelSize.smaller
+                    color: Appearance.colors.colOnLayer1
+                    font.pixelSize: Appearance.font.pixelSize.small
                 }
             }
 
             Item {
                 Layout.fillWidth: true
-                implicitHeight: 94
+                implicitHeight: Math.max(72, previewPill.height + 28)
 
                 Item {
                     id: previewPill
+                    readonly property real previewScale: Math.max(0.6, Config.options?.bar?.pill?.scale ?? 1) * 1.25
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.verticalCenter: parent.verticalCenter
-                    width: Math.min(parent.width - 24, Math.max(176, Config.options?.bar?.pill?.restWidth ?? 176) * 1.45)
-                    height: Math.max(44, Config.options?.bar?.pill?.restHeight ?? 44)
+                    width: Math.min(parent.width - 24,
+                        Math.max(160, Config.options?.bar?.pill?.restWidth ?? 176) * previewScale)
+                    height: Math.max(38, Config.options?.bar?.pill?.restHeight ?? 44) * previewScale
 
                     IslandPanel {
                         anchors.fill: parent
-                        radius: Math.min(parent.height / 2, Config.options?.appearance?.island?.radius ?? 18)
+                        radius: Math.min(parent.height / 2,
+                            (Config.options?.appearance?.island?.radius ?? 18) * previewPill.previewScale)
                         glassEnabled: true
                         screen: previewPill.QsWindow?.window?.screen ?? null
                     }
 
                     Row {
                         anchors.centerIn: parent
-                        spacing: 10
+                        spacing: Math.round(10 * previewPill.previewScale)
                         Rectangle {
                             anchors.verticalCenter: parent.verticalCenter
-                            width: 18
-                            height: 5
+                            width: Math.round(18 * previewPill.previewScale)
+                            height: Math.max(3, Math.round(5 * previewPill.previewScale))
                             radius: height / 2
                             color: PillTheme.vermLit
                         }
                         StyledText {
                             anchors.verticalCenter: parent.verticalCenter
                             text: "10:48"
-                            font.pixelSize: 17
+                            font.pixelSize: Math.round(17 * previewPill.previewScale)
                             font.weight: Font.DemiBold
                             color: PillTheme.cream
                         }
                         Rectangle {
                             anchors.verticalCenter: parent.verticalCenter
                             width: 1
-                            height: 18
+                            height: Math.round(18 * previewPill.previewScale)
                             color: PillTheme.hair
                         }
                         Repeater {
@@ -196,8 +197,8 @@ ColumnLayout {
                             Rectangle {
                                 required property int index
                                 anchors.verticalCenter: parent.verticalCenter
-                                width: index === 0 ? 16 : 5
-                                height: 5
+                                width: Math.round((index === 0 ? 16 : 5) * previewPill.previewScale)
+                                height: Math.max(3, Math.round(5 * previewPill.previewScale))
                                 radius: height / 2
                                 color: index === 0 ? PillTheme.vermLit : PillTheme.cream
                                 opacity: index === 0 ? 1 : 0.35
@@ -212,7 +213,7 @@ ColumnLayout {
                 horizontalAlignment: Text.AlignHCenter
                 text: Translation.tr("The preview uses the shared Ricelin Island material. Opacity, glass and edge treatment live in Settings › Ricelin › Island surfaces.")
                 color: Appearance.colors.colSubtext
-                font.pixelSize: Appearance.font.pixelSize.smallest
+                font.pixelSize: Appearance.font.pixelSize.small
                 wrapMode: Text.WordWrap
             }
         }
@@ -251,6 +252,19 @@ ColumnLayout {
                 checked: Config.options?.bar?.pill?.compactAnnounces ?? false
                 onCheckedChanged: Config.setNestedValue("bar.pill.compactAnnounces", checked)
                 StyledToolTip { text: Translation.tr("Keep notifications and OSD inside the resting pill instead of opening a larger face.") }
+            }
+        }
+
+        SettingsSwitch {
+            buttonIcon: "picture_in_picture"
+            text: Translation.tr("Float over windows")
+            enabled: !(Config.options?.bar?.autoHide?.enable ?? false)
+            checked: Config.options?.bar?.pill?.floatOverWindows ?? false
+            onCheckedChanged: Config.setNestedValue("bar.pill.floatOverWindows", checked)
+            StyledToolTip {
+                text: !(Config.options?.bar?.autoHide?.enable ?? false)
+                    ? Translation.tr("Keep the visible Pill above normal windows instead of reserving the top edge. Fullscreen still hides and unmaps it.")
+                    : Translation.tr("Auto-hide already controls whether the revealed Pill overlays or pushes windows.")
             }
         }
 
@@ -320,7 +334,7 @@ ColumnLayout {
             stepSize: 5
             onValueChanged: Config.setNestedValue("bar.pill.scale", value / 100)
             StyledToolTip {
-                text: Translation.tr("Pill keeps a monitor-aware readability floor, so very low values never make controls unusably small on 1080p and lower displays.")
+                text: Translation.tr("Scale the whole Pill and its surfaces. Monitor resolution is applied automatically.")
             }
         }
 
@@ -335,7 +349,7 @@ ColumnLayout {
                 icon: "pinch"
                 text: Translation.tr("Icon size (px)")
                 value: Config.options?.bar?.pill?.iconSize ?? 19
-                from: 19
+                from: 17
                 to: 28
                 stepSize: 1
                 onValueChanged: Config.setNestedValue("bar.pill.iconSize", value)
@@ -344,7 +358,7 @@ ColumnLayout {
                 icon: "space_bar"
                 text: Translation.tr("Icon spacing (px)")
                 value: Config.options?.bar?.pill?.iconSpacing ?? 14
-                from: 14
+                from: 12
                 to: 28
                 stepSize: 2
                 onValueChanged: Config.setNestedValue("bar.pill.iconSpacing", value)
@@ -355,7 +369,7 @@ ColumnLayout {
             icon: "format_letter_spacing"
             text: Translation.tr("Group spacing (px)")
             value: Config.options?.bar?.pill?.rowSpacing ?? 24
-            from: 24
+            from: 20
             to: 44
             stepSize: 2
             onValueChanged: Config.setNestedValue("bar.pill.rowSpacing", value)
@@ -367,7 +381,7 @@ ColumnLayout {
                 icon: "width"
                 text: Translation.tr("Rest width (px)")
                 value: Config.options?.bar?.pill?.restWidth ?? 176
-                from: 176
+                from: 160
                 to: 280
                 stepSize: 4
                 onValueChanged: Config.setNestedValue("bar.pill.restWidth", value)
@@ -376,7 +390,7 @@ ColumnLayout {
                 icon: "height"
                 text: Translation.tr("Rest height (px)")
                 value: Config.options?.bar?.pill?.restHeight ?? 44
-                from: 44
+                from: 38
                 to: 60
                 stepSize: 2
                 onValueChanged: Config.setNestedValue("bar.pill.restHeight", value)
@@ -387,7 +401,7 @@ ColumnLayout {
             icon: "unfold_more"
             text: Translation.tr("Expanded height (px)")
             value: Config.options?.bar?.pill?.expandedHeight ?? 66
-            from: 66
+            from: 58
             to: 88
             stepSize: 2
             onValueChanged: Config.setNestedValue("bar.pill.expandedHeight", value)
@@ -403,7 +417,7 @@ ColumnLayout {
             Layout.fillWidth: true
             text: Translation.tr("Disable faces you never use. Core faces such as media, mixer, calendar, link and power stay available because they are part of the Pill's primary navigation.")
             color: Appearance.colors.colSubtext
-            font.pixelSize: Appearance.font.pixelSize.smallest
+            font.pixelSize: Appearance.font.pixelSize.small
             wrapMode: Text.WordWrap
         }
 
@@ -587,11 +601,14 @@ ColumnLayout {
             ConfigSpinBox {
                 icon: "expand"
                 text: Translation.tr("Window gap (%)")
+                enabled: !(Config.options?.bar?.pill?.floatOverWindows ?? false)
+                    || (Config.options?.bar?.autoHide?.enable ?? false)
                 value: Math.round((Config.options?.bar?.pill?.appGap ?? 1) * 100)
                 from: 0
                 to: 200
                 stepSize: 10
                 onValueChanged: Config.setNestedValue("bar.pill.appGap", value / 100)
+                StyledToolTip { text: Translation.tr("Space between Pill and windows while the top edge is reserved.") }
             }
         }
         ConfigSpinBox {

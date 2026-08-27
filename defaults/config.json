@@ -572,6 +572,7 @@
                 "showGpu": true,
                 "showTemp": false,
                 "showDisk": false,
+                "showGpuTemp": false,
                 "showLabels": true,
                 "dim": 0,
                 "widgetScale": 100,
@@ -810,6 +811,7 @@
     "bar": {
         "pill": {
             "barMode": false,
+            "floatOverWindows": false,
             "scale": 1,
             "topGap": 1,
             "appGap": 1,

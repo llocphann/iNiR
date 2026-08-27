@@ -281,6 +281,18 @@ Singleton {
             }
         },
         {
+            id: "crush-charm",
+            name: "Crush Charm",
+            description: "Charm's Crush TUI palette (Charmtone Pantera)",
+            icon: "terminal",
+            colors: crushCharmColors,
+            tags: ["dark", "vibrant", "retro"],
+            meta: {
+                fontStyle: "mono",
+                roundingScale: 0.9
+            }
+        },
+        {
             id: "catppuccin-frappe",
             name: "Catppuccin Frappe",
             description: "Soft, warm pastel palette",
@@ -3273,6 +3285,81 @@ Singleton {
         term13: "#a13865",
         term14: "#2993a3",
         term15: "#393a34"
+    })
+
+    // Crush Charm - Charm's Crush TUI default theme (Charmtone Pantera)
+    readonly property var crushCharmColors: ({
+        darkmode: true,
+        m3background: "#201f26", // Pepper
+        m3onBackground: "#ecebf0", // Sash
+        m3surface: "#201f26", // Pepper
+        m3surfaceDim: "#1a1920",
+        m3surfaceBright: "#4d4c57", // Iron
+        m3surfaceContainerLowest: "#1a1920",
+        m3surfaceContainerLow: "#201f26", // Pepper
+        m3surfaceContainer: "#2d2c36", // BBQ
+        m3surfaceContainerHigh: "#3a3943", // Char
+        m3surfaceContainerHighest: "#4d4c57", // Iron
+        m3onSurface: "#ecebf0", // Sash
+        m3surfaceVariant: "#3a3943", // Char
+        m3onSurfaceVariant: "#bfbcc8", // Smoke
+        m3inverseSurface: "#ecebf0", // Sash
+        m3inverseOnSurface: "#201f26", // Pepper
+        m3outline: "#605f6b", // Oyster
+        m3outlineVariant: "#3a3943", // Char (separator)
+        m3shadow: "#000000",
+        m3scrim: "#000000",
+        m3surfaceTint: "#6b50ff", // Charple
+        m3primary: "#6b50ff", // Charple
+        m3onPrimary: "#fffaf1", // Butter
+        m3primaryContainer: "#3d2e8f",
+        m3onPrimaryContainer: "#d6ccff",
+        m3inversePrimary: "#8f7aff",
+        m3secondary: "#ff60ff", // Dolly
+        m3onSecondary: "#201f26", // Dark on magenta
+        m3secondaryContainer: "#6e2a6e",
+        m3onSecondaryContainer: "#ffc8ff",
+        m3tertiary: "#68ffd6", // Bok
+        m3onTertiary: "#201f26", // Dark on mint
+        m3tertiaryContainer: "#12c78f", // Guac
+        m3onTertiaryContainer: "#0a2e22",
+        m3error: "#eb4268", // Sriracha
+        m3onError: "#fffaf1", // Butter
+        m3errorContainer: "#5c1f2e",
+        m3onErrorContainer: "#ffb3c2", // Coral tint
+        m3primaryFixed: "#b7a6ff",
+        m3primaryFixedDim: "#6b50ff", // Charple
+        m3onPrimaryFixed: "#241452",
+        m3onPrimaryFixedVariant: "#3d2e8f",
+        m3secondaryFixed: "#ffa6ff", // Blush lightened
+        m3secondaryFixedDim: "#ff60ff", // Dolly
+        m3onSecondaryFixed: "#4a104a",
+        m3onSecondaryFixedVariant: "#6e2a6e",
+        m3tertiaryFixed: "#a8ffe8",
+        m3tertiaryFixedDim: "#68ffd6", // Bok
+        m3onTertiaryFixed: "#00382a",
+        m3onTertiaryFixedVariant: "#0b5c43",
+        m3success: "#12c78f", // Guac
+        m3onSuccess: "#0a2e22",
+        m3successContainer: "#0b5c43",
+        m3onSuccessContainer: "#8cf5d2",
+        // Charmtone terminal accents (Pink Floyd, Malibu, Zest, Julep...)
+        term0:  "#201f26",
+        term1:  "#eb4268",
+        term2:  "#12c78f",
+        term3:  "#f5ef34",
+        term4:  "#00a4ff",
+        term5:  "#ff60ff",
+        term6:  "#10b1ae",
+        term7:  "#ecebf0",
+        term8:  "#605f6b",
+        term9:  "#ff577d",
+        term10: "#00ffb2",
+        term11: "#e8fe96",
+        term12: "#6b50ff",
+        term13: "#ff84ff",
+        term14: "#68ffd6",
+        term15: "#fffaf1"
     })
 
     function getPreset(id) {

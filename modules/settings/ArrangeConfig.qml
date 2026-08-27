@@ -227,16 +227,23 @@ ContentPage {
                             color: Appearance.colors.colSubtext
                         }
 
-                        // Edit mode: compact field, confirmed with Enter or the check
-                        MaterialTextField {
-                            id: renameField
+                        // Edit mode: compact field, confirmed with Enter or the check.
+                        // The Item wrapper carries the fixed 240 width so the
+                        // MaterialTextField's own implicitWidth stays free of
+                        // Layout.preferredWidth feedback (avoids an implicitWidth
+                        // binding loop on every load).
+                        Item {
                             visible: parent.editing
                             Layout.preferredWidth: 240
-                            text: catGroup.cat.label
-                            onVisibleChanged: if (visible) { text = catGroup.cat.label; forceActiveFocus() }
-                            onAccepted: {
-                                root.renameCategory(slotCol.index, text)
-                                root.editingGroup = -1
+                            MaterialTextField {
+                                id: renameField
+                                anchors.fill: parent
+                                text: catGroup.cat.label
+                                onVisibleChanged: if (visible) { text = catGroup.cat.label; forceActiveFocus() }
+                                onAccepted: {
+                                    root.renameCategory(slotCol.index, text)
+                                    root.editingGroup = -1
+                                }
                             }
                         }
 

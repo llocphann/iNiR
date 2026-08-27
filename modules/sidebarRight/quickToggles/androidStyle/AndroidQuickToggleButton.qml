@@ -184,35 +184,38 @@ GroupButton {
         acceptedButtons: Qt.AllButtons
 
         function toggleEnabled() {
-            const index = root.buttonIndex;
-            const toggleList = Config.options?.sidebar?.quickToggles?.android?.toggles ?? [];
+            // Identify the entry by type: buttonIndex is positional and goes
+            // stale when rows are reused mid-edit, pinning/unpinning the wrong
+            // toggle.
             const buttonType = root.buttonData.type;
-            if (!toggleList.find(toggle => toggle.type === buttonType)) {
+            const toggleList = [...(Config.options?.sidebar?.quickToggles?.android?.toggles ?? [])];
+            const existingIndex = toggleList.findIndex(toggle => toggle && toggle.type === buttonType);
+            if (existingIndex === -1) {
                 toggleList.push({ type: buttonType, size: 1 });
             } else {
-                toggleList.splice(index, 1);
+                toggleList.splice(existingIndex, 1);
             }
             Config.setNestedValue("sidebar.quickToggles.android.toggles", toggleList);
         }
 
         function toggleSize() {
-            const index = root.buttonIndex;
-            const toggleList = Config.options?.sidebar?.quickToggles?.android?.toggles ?? [];
             const buttonType = root.buttonData.type;
-            if (!toggleList.find(toggle => toggle.type === buttonType)) return;
-            toggleList[index].size = 3 - toggleList[index].size; // Alternate between 1 and 2
+            const toggleList = [...(Config.options?.sidebar?.quickToggles?.android?.toggles ?? [])];
+            const existingIndex = toggleList.findIndex(toggle => toggle && toggle.type === buttonType);
+            if (existingIndex === -1) return;
+            toggleList[existingIndex].size = 3 - toggleList[existingIndex].size; // Alternate between 1 and 2
             Config.setNestedValue("sidebar.quickToggles.android.toggles", toggleList);
         }
 
         function movePositionBy(offset) {
-            const index = root.buttonIndex;
-            const toggleList = Config.options?.sidebar?.quickToggles?.android?.toggles ?? [];
             const buttonType = root.buttonData.type;
-            const targetIndex = index + offset;
-            if (!toggleList.find(toggle => toggle.type === buttonType)) return;
+            const toggleList = [...(Config.options?.sidebar?.quickToggles?.android?.toggles ?? [])];
+            const existingIndex = toggleList.findIndex(toggle => toggle && toggle.type === buttonType);
+            if (existingIndex === -1) return;
+            const targetIndex = existingIndex + offset;
             if (targetIndex < 0 || targetIndex >= toggleList.length) return;
-            const temp = toggleList[index];
-            toggleList[index] = toggleList[targetIndex];
+            const temp = toggleList[existingIndex];
+            toggleList[existingIndex] = toggleList[targetIndex];
             toggleList[targetIndex] = temp;
             Config.setNestedValue("sidebar.quickToggles.android.toggles", toggleList);
         }
@@ -228,9 +231,6 @@ GroupButton {
             toggleSize();
         }
         onWheel: (event) => {
-            const index = root.buttonIndex;
-            const toggleList = Config.options?.sidebar?.quickToggles?.android?.toggles ?? [];
-            const buttonType = root.buttonData.type;
             if (event.angleDelta.y < 0) { // Move to right
                 movePositionBy(1);
             } else if (event.angleDelta.y > 0) { // Move to left

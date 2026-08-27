@@ -15,6 +15,23 @@ ContentPage {
     settingsPageIndex: 0
     settingsPageName: Translation.tr("Quick")
     readonly property bool isOverlayPage: GlobalStates.settingsOverlayOpen ?? false
+    property string activeSection: "wallpaper"
+
+    SettingsTaskNavigator {
+        icon: "bolt"
+        title: ""
+        description: ""
+        summary: ""
+        showIntro: false
+        currentValue: root.activeSection
+        onSelected: value => root.activeSection = value
+        options: [
+            { displayName: Translation.tr("Wallpaper"), icon: "format_paint", value: "wallpaper" },
+            { displayName: Translation.tr("Bar & screen"), icon: "screenshot_monitor", value: "screen" },
+            { displayName: Translation.tr("Game mode"), icon: "sports_esports", value: "game" },
+            { displayName: Translation.tr("Actions"), icon: "bolt", value: "actions" }
+        ]
+    }
     // Deferred in both modes: entering the page must never kick off directory-wide
     // thumbnail generation. The user asks for the grid explicitly.
     property bool quickGridLoaded: false
@@ -37,6 +54,8 @@ ContentPage {
 
     // Wallpaper selection
     SettingsCardSection {
+        settingsTaskSection: "wallpaper"
+        visible: root.activeSection === "wallpaper"
         expanded: true
         icon: "format_paint"
         title: Translation.tr("Wallpaper & Colors")
@@ -1530,7 +1549,9 @@ ContentPage {
     }
 
     SettingsCardSection {
-        expanded: false
+        settingsTaskSection: "screen"
+        visible: root.activeSection === "screen"
+        expanded: true
         icon: "screenshot_monitor"
         title: Translation.tr("Bar & screen")
 
@@ -1667,7 +1688,9 @@ ContentPage {
     }
 
     SettingsCardSection {
-        expanded: false
+        settingsTaskSection: "game"
+        visible: root.activeSection === "game"
+        expanded: true
         icon: "sports_esports"
         title: Translation.tr("Game Mode")
 
@@ -1760,7 +1783,9 @@ ContentPage {
 
     // Quick Actions
     SettingsCardSection {
-        expanded: false
+        settingsTaskSection: "actions"
+        visible: root.activeSection === "actions"
+        expanded: true
         icon: "bolt"
         title: Translation.tr("Quick Actions")
 

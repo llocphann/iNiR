@@ -428,10 +428,14 @@ Singleton {
         readonly property color _baseOnSurface: m3colors.m3onSurface
         readonly property color _baseOnSurfaceVariant: m3colors.m3onSurfaceVariant
         
-        property color colSubtext: root.regaliaEverywhere ? root.regalia.onMuted : root.cookieEverywhere ? root.cookie.inkMuted : root.zzzEverywhere ? root.zzz.inkMuted : ColorUtils.readableSubtext(
-            _needsHighContrast ? _baseOnSurface : (root._auroraLightMode ? _inkSecondary : m3colors.m3outline),
+        property color colSubtext: root.regaliaEverywhere ? root.regalia.onMuted : root.cookieEverywhere ? root.cookie.inkMuted : root.zzzEverywhere ? root.zzz.inkMuted : ColorUtils.ensureReadable(
+            ColorUtils.mix(
+                _needsHighContrast ? _baseOnSurface : (root._auroraLightMode ? _inkSecondary : _baseOnSurfaceVariant),
+                colLayer1Base,
+                0.45
+            ),
             colLayer1Base,
-            0.75
+            5.5
         )
             
         // Layer 0

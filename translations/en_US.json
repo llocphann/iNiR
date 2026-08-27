@@ -1,3 +1,4 @@
+
 {
   "%1 active on this display": "%1 active on this display",
   "Bring to front": "Bring to front",
@@ -5352,5 +5353,9 @@
   "this session": "this session",
   "Notification popups and OSD indicators": "Notification popups and OSD indicators",
   "Choose which monitors show notifications and OSD feedback": "Choose which monitors show notifications and OSD feedback",
-  "Choose widget visibility and layout per monitor": "Choose widget visibility and layout per monitor"
+  "Choose widget visibility and layout per monitor": "Choose widget visibility and layout per monitor",
+  "Wallhaven rejected your API key. Check the key in settings and that your account allows NSFW.": "Wallhaven rejected your API key. Check the key in settings and that your account allows NSFW.",
+  "Wallhaven API error: %1": "Wallhaven API error: %1",
+  "No more results for this search.": "No more results for this search.",
+  "No wallpapers found for these tags and filters.": "No wallpapers found for these tags and filters."
 }

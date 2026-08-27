@@ -132,6 +132,7 @@ Flow {
             buttonIcon: modelData.icon || ""
             buttonPreviewKind: modelData.previewKind || ""
             buttonText: modelData.displayName
+            opacity: modelData?.dimmed === true ? 0.45 : 1
             toggled: (root.currentValue != null && root.currentValue == modelData.value) ?? false
             onClicked: {
                 root.selected(modelData.value);

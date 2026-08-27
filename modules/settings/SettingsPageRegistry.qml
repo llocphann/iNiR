@@ -576,8 +576,8 @@ Singleton {
             pageIndex: 21, pageName: root.pages[21].name,
             section: Translation.tr("Pill bar"),
             label: Translation.tr("Pill setup"),
-            description: Translation.tr("Behavior, entry points, readability, surfaces, hover-row modules, clock, glyphs and advanced geometry"),
-            keywords: ["ricelin", "pill", "bar", "morph", "launcher", "media", "overview", "kanji", "glyph", "sysmon", "clipboard", "scale", "gap", "expanded", "persistent", "compact", "toast", "osd", "notification", "hover", "row", "workspaces", "weather", "tray", "wifi", "battery", "mixer", "sidebar", "power", "soul", "bead", "icon", "size", "spacing"]
+            description: Translation.tr("Behavior, floating window overlap, entry points, readability, surfaces, modules and geometry"),
+            keywords: ["ricelin", "pill", "bar", "morph", "float", "floating", "overlap", "underlap", "window", "reserve", "launcher", "media", "overview", "kanji", "glyph", "sysmon", "clipboard", "scale", "gap", "expanded", "persistent", "compact", "toast", "osd", "notification", "hover", "row", "workspaces", "weather", "tray", "wifi", "battery", "mixer", "sidebar", "power", "soul", "bead", "icon", "size", "spacing"]
         },
         {
             pageIndex: 2, pageName: root.pages[2].name,
@@ -771,144 +771,6 @@ Singleton {
             label: Translation.tr("Backdrop vignette"),
             description: Translation.tr("Vignette darkening effect on backdrop"),
             keywords: ["backdrop", "vignette", "darken", "edges", "effect"]
-        },
-        // Desktop Widgets (page 14)
-        {
-            pageIndex: 14, pageName: root.pages[14].name,
-            section: Translation.tr("Edit Mode"),
-            label: Translation.tr("Widget edit mode"),
-            description: Translation.tr("Grid overlay and snap-to-grid for widget placement"),
-            keywords: ["widget", "edit", "grid", "snap", "placement", "drag"]
-        },
-        {
-            pageIndex: 14, pageName: root.pages[14].name,
-            section: Translation.tr("Appearance"),
-            label: Translation.tr("Desktop widgets"),
-            description: Translation.tr("Current iNiR palette"),
-            keywords: ["widget", "color", "colour", "palette", "preset", "primary", "secondary", "tertiary", "signal", "surface", "wallpaper"]
-        },
-        {
-            pageIndex: 14, pageName: root.pages[14].name,
-            section: Translation.tr("Clock"),
-            label: Translation.tr("Desktop clock"),
-            description: Translation.tr("Clock widget on the desktop background"),
-            keywords: ["clock", "widget", "cookie", "digital", "background", "desktop", "wallpaper", "adaptive", "colors"]
-        },
-        {
-            pageIndex: 14, pageName: root.pages[14].name,
-            section: Translation.tr("Clock"),
-            label: Translation.tr("Clock style"),
-            description: Translation.tr("Cookie (analog) or digital clock"),
-            keywords: ["clock", "style", "cookie", "digital", "analog", "hands"]
-        },
-        {
-            pageIndex: 14, pageName: root.pages[14].name,
-            section: Translation.tr("Japanese Typography"),
-            label: Translation.tr("Japanese typography widget"),
-            description: Translation.tr("Vertical editorial lettering with layout, font, palette, seal, and footer controls"),
-            keywords: ["japanese", "typography", "vertical", "text", "kanji", "kana", "poster", "magazine", "editorial", "seal", "widget", "font", "mincho", "gothic", "color", "palette", "sumi", "outline"]
-        },
-        {
-            pageIndex: 14, pageName: root.pages[14].name,
-            section: Translation.tr("Weather"),
-            label: Translation.tr("Desktop weather widget"),
-            description: Translation.tr("Weather display on the desktop background"),
-            keywords: ["weather", "widget", "background", "temperature"]
-        },
-        {
-            pageIndex: 14, pageName: root.pages[14].name,
-            section: Translation.tr("Custom image"),
-            label: Translation.tr("Custom media gallery"),
-            description: Translation.tr("Show one image, GIF, or video, or rotate a mixed-media folder"),
-            keywords: ["custom", "image", "photo", "static", "gif", "animated", "video", "movie", "gallery", "folder", "slideshow", "interval", "speed", "random", "sequential", "fit", "shape", "widget", "desktop", "drop"]
-        },
-        {
-            pageIndex: 14, pageName: root.pages[14].name,
-            section: Translation.tr("Image converter"),
-            label: Translation.tr("Image converter"),
-            description: Translation.tr("Convert dropped images to PNG, JPG, WEBP, AVIF, BMP, TIFF or PDF"),
-            keywords: ["image", "convert", "converter", "png", "jpg", "webp", "avif", "bmp", "tiff", "pdf", "drop", "desktop", "widget"]
-        },
-        {
-            pageIndex: 14, pageName: root.pages[14].name,
-            section: Translation.tr("World clock"),
-            label: Translation.tr("World clock"),
-            description: Translation.tr("Local time and four configurable time zones"),
-            keywords: ["world", "clock", "timezone", "city", "desktop", "widget"]
-        },
-        {
-            pageIndex: 14, pageName: root.pages[14].name,
-            section: Translation.tr("User card"),
-            label: Translation.tr("User card"),
-            description: Translation.tr("Identity, uptime, weather and session actions"),
-            keywords: ["user", "profile", "uptime", "weather", "lock", "settings", "power", "desktop", "widget"]
-        },
-        {
-            pageIndex: 14, pageName: root.pages[14].name,
-            section: Translation.tr("Media Controls"),
-            label: Translation.tr("Desktop media widget"),
-            description: Translation.tr("Media player controls on the desktop background"),
-            keywords: ["media", "widget", "background", "player", "music", "album"]
-        },
-        {
-            pageIndex: 14, pageName: root.pages[14].name,
-            section: Translation.tr("Visualizer"),
-            label: Translation.tr("Audio visualizer"),
-            description: Translation.tr("Audio visualizer bars on the desktop"),
-            keywords: ["visualizer", "audio", "bars", "music", "equalizer", "spectrum"]
-        },
-        {
-            pageIndex: 14, pageName: root.pages[14].name,
-            section: Translation.tr("System Monitor"),
-            label: Translation.tr("System monitor widget"),
-            description: Translation.tr("CPU, RAM, GPU usage on the desktop"),
-            keywords: ["system", "monitor", "cpu", "ram", "gpu", "usage", "performance"]
-        },
-        {
-            pageIndex: 14, pageName: root.pages[14].name,
-            section: Translation.tr("Battery"),
-            label: Translation.tr("Desktop battery widget"),
-            description: Translation.tr("Battery status on the desktop background"),
-            keywords: ["battery", "widget", "background", "charge", "power"]
-        },
-
-        // =====================================================================
-        // Monitors (page 15)
-        // =====================================================================
-        {
-            pageIndex: 15, pageName: root.pages[15].name,
-            section: Translation.tr("Shell visibility"),
-            label: Translation.tr("Primary monitor"),
-            description: Translation.tr("Choose the default output for shell popups"),
-            keywords: ["monitor", "display", "primary", "screen", "output"]
-        },
-        {
-            pageIndex: 15, pageName: root.pages[15].name,
-            section: Translation.tr("Overview placement"),
-            label: Translation.tr("Active screen only"),
-            description: Translation.tr("Open the overview on the monitor where it was invoked"),
-            keywords: ["overview", "monitor", "screen", "focused", "active", "output"]
-        },
-        {
-            pageIndex: 15, pageName: root.pages[15].name,
-            section: Translation.tr("Material shell surfaces"),
-            label: Translation.tr("Bar, dock, sidebars, and media controls"),
-            description: Translation.tr("Choose which monitors show Material shell surfaces"),
-            keywords: ["monitor", "visibility", "bar", "dock", "sidebar", "media", "workspace", "secondary"]
-        },
-        {
-            pageIndex: 15, pageName: root.pages[15].name,
-            section: Translation.tr("Popups"),
-            label: Translation.tr("Notification popups and OSD indicators"),
-            description: Translation.tr("Choose which monitors show notifications and OSD feedback"),
-            keywords: ["monitor", "visibility", "notifications", "osd", "popups", "secondary", "workspace"]
-        },
-        {
-            pageIndex: 15, pageName: root.pages[15].name,
-            section: Translation.tr("Desktop widgets"),
-            label: Translation.tr("Desktop widgets"),
-            description: Translation.tr("Choose widget visibility and layout per monitor"),
-            keywords: ["monitor", "visibility", "desktop", "widgets", "layout", "secondary", "workspace"]
         },
 
         // =====================================================================

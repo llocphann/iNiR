@@ -404,10 +404,11 @@ def _ensure_vrr_window_rule():
 def _set_in_block(block_content, key, value):
     """Set a key=value inside a KDL block, preserving other content.
     If key exists, replace the line. If not, append it."""
-    # Escape key for regex (handles hyphens)
+    # Escape key for regex (handles hyphens). Anchored to line start so
+    # commented example lines mentioning the key are never edited.
     escaped = re.escape(key)
     # Try to replace existing line
-    pattern = rf"(\n?\s*){escaped}\b[^\n]*"
+    pattern = rf"(?m)^([ \t]*){escaped}\b[^\n]*"
     if re.search(pattern, block_content):
         if value:
             return re.sub(pattern, rf"\g<1>{key} {value}", block_content, count=1)
@@ -511,13 +512,13 @@ def cmd_get_input():
         if kb_block:
             xkb_block = _extract_block(kb_block, "xkb")
             if xkb_block:
-                m = re.search(r'layout\s+"([^"]*)"', xkb_block)
+                m = re.search(r'^[ \t]*layout\s+"([^"]*)"', xkb_block, re.MULTILINE)
                 if m:
                     result["keyboard"]["layout"] = m.group(1)
-                m = re.search(r'variant\s+"([^"]*)"', xkb_block)
+                m = re.search(r'^[ \t]*variant\s+"([^"]*)"', xkb_block, re.MULTILINE)
                 if m:
                     result["keyboard"]["variant"] = m.group(1)
-                m = re.search(r'options\s+"([^"]*)"', xkb_block)
+                m = re.search(r'^[ \t]*options\s+"([^"]*)"', xkb_block, re.MULTILINE)
                 if m:
                     result["keyboard"]["options"] = m.group(1)
             m = re.search(r"repeat-delay\s+(\d+)", kb_block)
@@ -2032,7 +2033,7 @@ def _toggle_subsection_enabled(content, section, enable):
 
 def _remove_key_from_block_content(block_content, key):
     return re.sub(
-        rf"\n?\s*{re.escape(key)}\b[^\n]*",
+        rf"(?m)^[ \t]*{re.escape(key)}\b[^\n]*\n?",
         "",
         block_content,
         count=1,

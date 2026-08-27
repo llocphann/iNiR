@@ -1,6 +1,8 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtQuick.Effects
+import Qt5Compat.GraphicalEffects as GE
 import Quickshell
 import qs
 import qs.services
@@ -53,11 +55,11 @@ Item {
     signal trayMenuRequested(var item, real anchorX)
     property bool trayMenuOpen: false
 
-    readonly property real restW: Math.max(176, Config.options?.bar?.pill?.restWidth ?? 176) * s
-    readonly property real restH: Math.max(44, Config.options?.bar?.pill?.restHeight ?? 44) * s
+    readonly property real restW: Math.max(160, Config.options?.bar?.pill?.restWidth ?? 176) * s
+    readonly property real restH: Math.max(38, Config.options?.bar?.pill?.restHeight ?? 44) * s
     readonly property real hoverPad: 24 * s
     readonly property real hoverW: hoverRow.implicitWidth + 2 * hoverPad
-    readonly property real hoverH: Math.max(66, Config.options?.bar?.pill?.expandedHeight ?? 66) * s
+    readonly property real hoverH: Math.max(58, Config.options?.bar?.pill?.expandedHeight ?? 66) * s
     readonly property real gameH: 34 * s
     readonly property real gameW: barWindow ? barWindow.width : 1920
     /**
@@ -106,7 +108,7 @@ Item {
 
     // Icon size for the pill's furniture, snapped to whole pixels so the vector
     // glyphs rasterise crisp. Hit areas grow with it.
-    readonly property real iconPx: Math.round(Math.max(19, Config.options?.bar?.pill?.iconSize ?? 19) * s)
+    readonly property real iconPx: Math.round(Math.max(17, Config.options?.bar?.pill?.iconSize ?? 19) * s)
 
     // Toasts off hands notifications back to the standalone popup panel
     // (ShellIiPanels re-enables it), so nothing goes silent.
@@ -407,21 +409,105 @@ Item {
         }
     }
 
-    IslandPanel {
+    Item {
+        id: glassClip
+        anchors.fill: parent
+        z: -1
+        clip: true
+
+        Item {
+            id: glass
+            anchors.fill: parent
+            anchors.bottomMargin: 1
+
+            readonly property bool active: pill.visible
+                && PillTheme.islandGlass
+                && Appearance.effectsEnabled
+                && PillTheme.pillOpacity < 0.999
+
+            visible: active
+            layer.enabled: active
+            layer.effect: GE.OpacityMask {
+                maskSource: Rectangle {
+                    width: glass.width
+                    height: glass.height
+                    radius: body.radius
+                    topLeftRadius: body.topLeftRadius
+                    topRightRadius: body.topRightRadius
+                    bottomLeftRadius: body.bottomLeftRadius
+                    bottomRightRadius: body.bottomRightRadius
+                }
+            }
+
+            Image {
+                id: glassWallpaper
+                x: -pill.x
+                y: -pill.y
+                width: pill.barWindow?.width ?? 1920
+                height: pill.barWindow?.height ?? 1080
+                visible: glass.active && status === Image.Ready
+                source: glass.active
+                    ? WallpaperListener.wallpaperUrlForScreen(pill.barWindow?.screen ?? null) : ""
+                fillMode: Image.PreserveAspectCrop
+                cache: true
+                asynchronous: true
+                sourceSize.width: Math.round(width)
+                sourceSize.height: Math.round(height)
+
+                layer.enabled: glass.active
+                layer.effect: MultiEffect {
+                    source: glassWallpaper
+                    anchors.fill: source
+                    saturation: 0.15
+                    blurEnabled: true
+                    blurMax: 64
+                    blur: PillTheme.islandGlassBlur
+                }
+            }
+        }
+    }
+
+    Rectangle {
         id: body
         anchors.fill: parent
-        glassEnabled: true
-        screen: pill.barWindow?.screen ?? null
-        shadowOffset: 3 * pill.s
-        radius: pill.morphRadius
 
         property real gameFlat: pill.mode === "game" ? 1 : 0
         Behavior on gameFlat { NumberAnimation { duration: PillMotion.morph; easing.type: PillMotion.easeMorph; easing.bezierCurve: PillMotion.morphCurve } }
 
-        topLeftRadiusOverride: pill.morphRadius * (1 - gameFlat)
-        topRightRadiusOverride: pill.morphRadius * (1 - gameFlat)
-        bottomLeftRadiusOverride: pill.morphRadius * (1 - gameFlat)
-        bottomRightRadiusOverride: pill.morphRadius * (1 - gameFlat)
+        radius: pill.morphRadius
+        topLeftRadius: pill.morphRadius * (1 - gameFlat)
+        topRightRadius: pill.morphRadius * (1 - gameFlat)
+        bottomLeftRadius: pill.morphRadius * (1 - gameFlat)
+        bottomRightRadius: pill.morphRadius * (1 - gameFlat)
+        border.width: 0
+        gradient: Gradient {
+            GradientStop { position: 0.0; color: Qt.alpha(PillTheme.cardTop, PillTheme.pillOpacity) }
+            GradientStop { position: 1.0; color: Qt.alpha(PillTheme.cardBot, PillTheme.pillOpacity) }
+        }
+
+        Rectangle {
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.topMargin: 1
+            anchors.leftMargin: body.radius * 0.6
+            anchors.rightMargin: body.radius * 0.6
+            height: 1
+            visible: PillTheme.islandSheen
+            color: PillTheme.sheen
+        }
+    }
+
+    GE.DropShadow {
+        anchors.fill: body
+        source: body
+        visible: Appearance.effectsEnabled && PillTheme.islandShadow && pill.visible
+        z: -2
+        color: Qt.rgba(0, 0, 0, PillTheme.shadowOpacity)
+        radius: 16
+        samples: 33
+        verticalOffset: 3 * pill.s
+        transparentBorder: true
     }
 
     /**
@@ -732,7 +818,7 @@ Item {
             // every glyph on a half pixel and smear the strokes.
             x: Math.round((parent.width - width) / 2)
             y: Math.round((parent.height - height) / 2)
-            spacing: Math.round(Math.max(24, Config.options?.bar?.pill?.rowSpacing ?? 24) * pill.s)
+            spacing: Math.round(Math.max(20, Config.options?.bar?.pill?.rowSpacing ?? 24) * pill.s)
 
             PillWorkspaces {
                 id: ws
@@ -808,7 +894,7 @@ Item {
             Row {
                 id: statusRow
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: Math.round(Math.max(14, Config.options?.bar?.pill?.iconSpacing ?? 14) * pill.s)
+                spacing: Math.round(Math.max(12, Config.options?.bar?.pill?.iconSpacing ?? 14) * pill.s)
 
                 Row {
                     id: weatherGlance
