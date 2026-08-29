@@ -154,7 +154,7 @@ ColumnLayout {
 
                 Item {
                     id: previewPill
-                    readonly property real previewScale: Math.max(0.6, Config.options?.bar?.pill?.scale ?? 1) * 1.25
+                    readonly property real previewScale: (Config.options?.bar?.pill?.scale ?? 1) * 1.25
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.verticalCenter: parent.verticalCenter
                     width: Math.min(parent.width - 24,
@@ -329,12 +329,12 @@ ColumnLayout {
             icon: "zoom_in"
             text: Translation.tr("Scale (%)")
             value: Math.round((Config.options?.bar?.pill?.scale ?? 1) * 100)
-            from: 60
+            from: 40
             to: 160
             stepSize: 5
             onValueChanged: Config.setNestedValue("bar.pill.scale", value / 100)
             StyledToolTip {
-                text: Translation.tr("Scale the whole Pill and its surfaces. Monitor resolution is applied automatically.")
+                text: Translation.tr("Relative scale for the whole Pill and its surfaces. Logical monitor size is applied automatically; compact displays can be reduced further here.")
             }
         }
 

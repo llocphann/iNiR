@@ -1133,6 +1133,7 @@
         "overlayStyle": "rail",
         "easyMode": true,
         "categories": "",
+        "chromeLayout": "",
         "overlayAppearance": {
             "scrimDim": 35,
             "backgroundOpacity": 1.0,
@@ -1347,11 +1348,6 @@
             "scale": 0.5
         },
         "openingZoomAnimation": false,
-        "recorder": {
-            "autoHideOnFullscreen": true,
-            "suppressToasts": true,
-            "disableNiriAnims": false
-        },
         "scrimAnimationDurationMs": 60,
         "scrimDim": 100
     },

@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
+import QtQuick.Dialogs
 import Quickshell
 import Quickshell.Io
 import qs.services
@@ -37,8 +38,14 @@ ContentPage {
     property string detectedDefaultSink: ""
     property string detectedDefaultSource: ""
     property bool audioMixAvailable: false
+    property string captureFolderTarget: "recordings"
 
     readonly property string recordingAudioMode: RecorderStatus.configuredAudioMode
+    readonly property string effectiveRecordingPath: {
+        const configured = Config.options?.screenRecord?.savePath ?? ""
+        return configured.length > 0 ? configured : Directories.videosPath
+    }
+    readonly property string effectiveScreenshotPath: Directories.screenshotsPath
     readonly property string detectedDefaultAudioSource: detectedDefaultSink.length > 0 ? `${detectedDefaultSink}.monitor` : ""
     readonly property var recordingAudioModeOptions: [
         { value: "none", displayName: Translation.tr("No audio") },
@@ -46,6 +53,30 @@ ContentPage {
         { value: "microphone", displayName: Translation.tr("Microphone") },
         { value: "both", displayName: Translation.tr("System + microphone") }
     ]
+
+    function openCaptureFolderDialog(target: string): void {
+        root.captureFolderTarget = target
+        captureFolderDialog.open()
+    }
+
+    FolderDialog {
+        id: captureFolderDialog
+        title: root.captureFolderTarget === "screenshots"
+            ? Translation.tr("Select screenshots folder")
+            : Translation.tr("Select recordings folder")
+        currentFolder: `file://${root.captureFolderTarget === "screenshots"
+            ? root.effectiveScreenshotPath : root.effectiveRecordingPath}`
+        onAccepted: {
+            const path = FileUtils.trimFileProtocol(String(selectedFolder))
+            Config.setNestedValue(root.captureFolderTarget === "screenshots"
+                ? "regionSelector.savePath" : "screenRecord.savePath", path)
+        }
+    }
+
+    SettingsNativeDialogGuard {
+        dialog: captureFolderDialog
+        dialogKey: "tools-capture-folder"
+    }
     readonly property bool vaapiRecordingAvailable: detectedVideoCodecs.some(codec => String(codec).indexOf("_vaapi") !== -1)
     readonly property bool nvencRecordingAvailable: detectedVideoCodecs.some(codec => String(codec).indexOf("_nvenc") !== -1)
     readonly property bool gpuRecordingAvailable: vaapiRecordingAvailable || nvencRecordingAvailable
@@ -390,6 +421,36 @@ ContentPage {
                         : Translation.tr("No GPU encoder detected. Software recording will be used.")
             }
 
+            ContentSubsection {
+                title: Translation.tr("Recording folder")
+
+                StyledText {
+                    Layout.fillWidth: true
+                    text: Directories.shortHomePath(root.effectiveRecordingPath)
+                    color: Appearance.colors.colOnLayer1
+                    elide: Text.ElideMiddle
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Appearance.sizes.spacingSmall
+
+                    RippleButtonWithIcon {
+                        Layout.fillWidth: true
+                        materialIcon: "folder_open"
+                        mainText: Translation.tr("Open folder")
+                        onClicked: ShellExec.openDirectory(root.effectiveRecordingPath, Translation.tr("Open recordings folder"))
+                    }
+
+                    RippleButtonWithIcon {
+                        Layout.fillWidth: true
+                        materialIcon: "drive_file_move"
+                        mainText: Translation.tr("Change folder")
+                        onClicked: root.openCaptureFolderDialog("recordings")
+                    }
+                }
+            }
+
             ConfigRow {
                 uniform: true
 
@@ -701,6 +762,36 @@ ContentPage {
                     onCheckedChanged: Config.setNestedValue("regionSelector.rememberSnipChoice", checked)
                     StyledToolTip {
                         text: Translation.tr("The unified snip menu reopens with the action and shape last picked in its toolbar. Dedicated screenshot, OCR and visual-search shortcuts always keep their explicit action. Recording is never remembered. When off, the menu opens as a rectangle screenshot.")
+                    }
+                }
+            }
+
+            ContentSubsection {
+                title: Translation.tr("Screenshots folder")
+
+                StyledText {
+                    Layout.fillWidth: true
+                    text: Directories.shortHomePath(root.effectiveScreenshotPath)
+                    color: Appearance.colors.colOnLayer1
+                    elide: Text.ElideMiddle
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Appearance.sizes.spacingSmall
+
+                    RippleButtonWithIcon {
+                        Layout.fillWidth: true
+                        materialIcon: "folder_open"
+                        mainText: Translation.tr("Open folder")
+                        onClicked: ShellExec.openDirectory(root.effectiveScreenshotPath, Translation.tr("Open screenshots folder"))
+                    }
+
+                    RippleButtonWithIcon {
+                        Layout.fillWidth: true
+                        materialIcon: "drive_file_move"
+                        mainText: Translation.tr("Change folder")
+                        onClicked: root.openCaptureFolderDialog("screenshots")
                     }
                 }
             }

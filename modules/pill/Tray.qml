@@ -24,8 +24,8 @@ Item {
     implicitWidth: visible ? row.implicitWidth : 0
     implicitHeight: 30 * tray.s
 
-    /** Raised for the shell to open this item's native menu at the given x. */
-    signal menuRequested(var item, real anchorX)
+    /** Raised for the shell to open this item's native menu at the given point. */
+    signal menuRequested(var item, real anchorX, real anchorY)
 
     /** Set by the shell while it is showing a menu for this tray. */
     property bool menuOpen: false
@@ -33,8 +33,8 @@ Item {
     function showMenu(item, anchorItem) {
         if (!item.hasMenu)
             return;
-        const p = anchorItem.mapToItem(null, anchorItem.width / 2, 0);
-        tray.menuRequested(item, p.x);
+        const p = anchorItem.mapToItem(null, anchorItem.width / 2, anchorItem.height);
+        tray.menuRequested(item, p.x, p.y);
     }
 
     RowLayout {

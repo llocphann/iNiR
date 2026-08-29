@@ -361,6 +361,9 @@ Singleton {
     // Internals
     PwObjectTracker {
         objects: [rawSink, sink, source]
+            .concat(root.outputAppNodes ?? [])
+            .concat(root.inputAppNodes ?? [])
+            .filter(node => node)
     }
 
     // Reset protection state and stop any in-flight ramp when sink changes so

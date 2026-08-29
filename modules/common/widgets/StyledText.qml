@@ -16,13 +16,13 @@ Text {
     }
     transform: root.animateChange ? [slideTransform] : []
 
-    renderType: Text.QtRendering
+    renderType: Text.NativeRendering
     verticalAlignment: Text.AlignVCenter
     property bool shouldUseNumberFont: /^\d+$/.test(root.text)
     property var defaultFont: shouldUseNumberFont ? Appearance.font.family.numbers : Appearance.font.family.main
     
     font {
-        hintingPreference: Font.PreferNoHinting
+        hintingPreference: Font.PreferDefaultHinting
         family: defaultFont
         pixelSize: Appearance?.font.pixelSize.small ?? 15
         variableAxes: shouldUseNumberFont ? ({}) : Appearance.font.variableAxes.main

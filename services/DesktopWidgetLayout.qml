@@ -268,6 +268,15 @@ Singleton {
         return true
     }
 
+    function setGloballyEnabled(widgetKey, enabled): bool {
+        const path = root._basePath(widgetKey)
+        if (!path)
+            return false
+        Config.setNestedValue(path + ".enable", Boolean(enabled))
+        root.clearEnableOverrides()
+        return true
+    }
+
     function clearEnableOverrides(): bool {
         const list = root._normalizedRecords()
         let changed = false

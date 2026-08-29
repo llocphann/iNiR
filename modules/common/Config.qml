@@ -1805,6 +1805,7 @@ Singleton {
                 property JsonObject backdrop: JsonObject {
                     property bool enable: true
                     property bool hideWallpaper: false
+                    property string fillMode: "fill" // "fill", "fit"
                     property bool useMainWallpaper: true
                     property string wallpaperPath: ""
                     property string thumbnailPath: "" // Thumbnail for animated wallpapers (video/gif)
@@ -2536,11 +2537,6 @@ Singleton {
                     property string imageSource: "https://media.tenor.com/H5U5bJzj3oAAAAAi/kukuru.gif"
                     property real scale: 0.5
                 }
-                property JsonObject recorder: JsonObject {
-                    property bool autoHideOnFullscreen: true
-                    property bool suppressToasts: true
-                    property bool disableNiriAnims: false
-                }
             }
 
             property JsonObject overview: JsonObject {
@@ -2641,6 +2637,7 @@ Singleton {
                     // instead of the external swappy/satty tools.
                     property bool useNativeEditor: true
                 }
+                property string savePath: "" // Empty = use XDG Pictures/Screenshots
                 property string screenshotNameFormat: "ss-%Y%m%d-%H%M%S" // date(1) format for screenshot filenames (without extension)
             }
 
@@ -3123,6 +3120,7 @@ Singleton {
                 // JSON-encoded [{label, pages:[int]}] — custom nav arrangement; "" = registry defaults.
                 // String on purpose: property var inside JsonObject crashes the VME.
                 property string categories: ""
+                property string chromeLayout: ""
                 property JsonObject overlayAppearance: JsonObject {
                     property int scrimDim: 35           // % dim of the backdrop scrim behind the settings panel (0-100)
                     // Opacity of the settings panel background (0.6-1.0). The

@@ -1306,7 +1306,7 @@ ContentPage {
                 Process {
                     id: sysTzProc
                     command: ["/usr/bin/readlink", "/etc/localtime"]
-                    running: true
+                    running: root.activeSection === "widgets"
                     stdout: StdioCollector {
                         onStreamFinished: {
                             const raw = text.trim()
@@ -1375,7 +1375,7 @@ ContentPage {
 
                 Timer {
                     interval: 20000
-                    running: worldClockSection.visible
+                    running: root.activeSection === "widgets" && worldClockSection.visible
                     repeat: true
                     triggeredOnStart: true
                     onTriggered: worldClockSection.refreshLiveTimes()
@@ -1383,7 +1383,10 @@ ContentPage {
 
                 Connections {
                     target: Config
-                    function onConfigChanged() { worldClockSection.refreshLiveTimes() }
+                    function onConfigChanged() {
+                        if (root.activeSection === "widgets")
+                            worldClockSection.refreshLiveTimes()
+                    }
                 }
 
                 // ═══════════════════════════════════════════════════════

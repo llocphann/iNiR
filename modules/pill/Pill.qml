@@ -52,7 +52,7 @@ Item {
     signal requestClose()
 
     /** Forwarded up so the root Scope can host the tray menu's own window. */
-    signal trayMenuRequested(var item, real anchorX)
+    signal trayMenuRequested(var item, real anchorX, real anchorY)
     property bool trayMenuOpen: false
 
     readonly property real restW: Math.max(160, Config.options?.bar?.pill?.restWidth ?? 176) * s
@@ -939,7 +939,10 @@ Item {
                     barWindow: pill.barWindow
                     enabled: hover.live
                     menuOpen: pill.trayMenuOpen
-                    onMenuRequested: (item, anchorX) => pill.trayMenuRequested(item, anchorX)
+                    onMenuRequested: (item, anchorX, _anchorY) => {
+                        const bottom = pill.mapToItem(null, 0, pill.height);
+                        pill.trayMenuRequested(item, anchorX, bottom.y);
+                    }
                 }
 
                 Item {

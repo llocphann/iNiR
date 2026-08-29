@@ -17,6 +17,7 @@ Commands:
   list-cursor-themes   List available cursor themes from icon dirs
   validate             Validate current Niri config via niri validate
   detect-customizations Report Niri files that differ from shipped iNiR defaults
+  sync-backdrop-overview-shadow on|off  Manage the backdrop-only overview shadow override
   set SECTION KEY VAL  Surgical edit of a single config value
   get-binds            JSON of all keybinds from 70-binds.kdl with categories/metadata
   set-bind KEY ACTION  Add or update a keybind in 70-binds.kdl (surgical edit)
@@ -44,6 +45,9 @@ DEFAULT_NIRI_FILES = [
     "config.d/80-layer-rules.kdl",
     "config.d/90-user-extra.kdl",
 ]
+
+BACKDROP_SHADOW_OVERRIDE_START = "// >>> inir-backdrop-only >>>"
+BACKDROP_SHADOW_OVERRIDE_END = "// <<< inir-backdrop-only <<<"
 
 
 def get_niri_config_dir():
@@ -1364,6 +1368,41 @@ def cmd_set(args):
     else:
         print(json.dumps({"error": f"Unknown section: {section}"}))
         return 1
+
+
+def cmd_sync_backdrop_overview_shadow(args):
+    if len(args) != 1 or args[0] not in ("on", "off"):
+        print(json.dumps({"error": "Usage: sync-backdrop-overview-shadow on|off"}))
+        return 1
+
+    target_file = resolve_niri_section_file("config.d/90-user-extra.kdl")
+    content = target_file.read_text() if target_file.exists() else ""
+    managed_pattern = re.compile(
+        rf"\n?{re.escape(BACKDROP_SHADOW_OVERRIDE_START)}.*?"
+        rf"{re.escape(BACKDROP_SHADOW_OVERRIDE_END)}\n?",
+        re.DOTALL,
+    )
+    next_content = managed_pattern.sub("\n", content).rstrip()
+
+    if args[0] == "on":
+        managed_block = (
+            f"{BACKDROP_SHADOW_OVERRIDE_START}\n"
+            "overview {\n"
+            "    workspace-shadow {\n"
+            "        off\n"
+            "    }\n"
+            "}\n"
+            f"{BACKDROP_SHADOW_OVERRIDE_END}"
+        )
+        next_content = f"{next_content}\n\n{managed_block}\n" if next_content else f"{managed_block}\n"
+    elif next_content:
+        next_content += "\n"
+
+    if next_content == content:
+        print(json.dumps({"success": True, "file": str(target_file), "changed": False}))
+        return 0
+
+    return _write_validated(target_file, next_content)
 
 
 def _sync_cursor_env(theme=None, size=None):
@@ -2783,6 +2822,7 @@ def main():
         "sync-cursor": lambda: cmd_sync_cursor(),
         "validate": lambda: cmd_validate(),
         "detect-customizations": lambda: cmd_detect_customizations(),
+        "sync-backdrop-overview-shadow": lambda: cmd_sync_backdrop_overview_shadow(args),
         "set": lambda: cmd_set(args),
         "get-binds": lambda: cmd_get_binds(),
         "set-bind": lambda: cmd_set_bind(args),

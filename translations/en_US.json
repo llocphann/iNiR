@@ -1,4 +1,3 @@
-
 {
   "%1 active on this display": "%1 active on this display",
   "Bring to front": "Bring to front",
@@ -5357,5 +5356,7 @@
   "Wallhaven rejected your API key. Check the key in settings and that your account allows NSFW.": "Wallhaven rejected your API key. Check the key in settings and that your account allows NSFW.",
   "Wallhaven API error: %1": "Wallhaven API error: %1",
   "No more results for this search.": "No more results for this search.",
-  "No wallpapers found for these tags and filters.": "No wallpapers found for these tags and filters."
+  "No wallpapers found for these tags and filters.": "No wallpapers found for these tags and filters.",
+  "Wallhaven rate limit reached. Wait a moment and try again.": "Wallhaven rate limit reached. Wait a moment and try again.",
+  "Wallhaven request failed (HTTP %1).": "Wallhaven request failed (HTTP %1)."
 }

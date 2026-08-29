@@ -180,7 +180,7 @@ Singleton {
             key: "arrange",
             name: Translation.tr("Arrange"),
             icon: "swap_vert",
-            desc: Translation.tr("Reorder settings groups and pages"),
+            desc: Translation.tr("Reorder and hide navigation pages"),
             essential: false,
             component: "modules/settings/ArrangeConfig.qml"
         },
@@ -294,7 +294,20 @@ Singleton {
         return (idx >= 0 && idx < pages.length) ? (pages[idx].icon || "settings") : "settings";
     }
 
-    readonly property var staticSearchIndex: [
+    property var _staticSearchIndex: null
+
+    Connections {
+        target: Translation
+        function onLanguageCodeChanged(): void { root._staticSearchIndex = null }
+        function onTranslationsChanged(): void { root._staticSearchIndex = null }
+        function onGeneratedTranslationsChanged(): void { root._staticSearchIndex = null }
+    }
+
+    function searchIndex(): var {
+        if (_staticSearchIndex !== null)
+            return _staticSearchIndex
+
+        _staticSearchIndex = [
         {
             pageIndex: 27, pageName: root.pages[27].name,
             section: Translation.tr("Power management"),
@@ -341,6 +354,20 @@ Singleton {
             keywords: ["bar", "position", "screen", "round", "corner"]
         },
         {
+            pageIndex: 0, pageName: root.pages[0].name,
+            section: Translation.tr("Capture locations"),
+            label: Translation.tr("Recordings folder"),
+            description: Translation.tr("Where screen recordings are saved"),
+            keywords: ["capture", "record", "recording", "video", "save", "path", "folder", "directory"]
+        },
+        {
+            pageIndex: 0, pageName: root.pages[0].name,
+            section: Translation.tr("Capture locations"),
+            label: Translation.tr("Screenshots folder"),
+            description: Translation.tr("Where iNiR screenshots are saved"),
+            keywords: ["capture", "screenshot", "snip", "save", "path", "folder", "directory", "picture"]
+        },
+        {
             pageIndex: 19, pageName: root.pages[19].name,
             section: Translation.tr("Mascot"),
             label: Translation.tr("Mascot"),
@@ -379,8 +406,8 @@ Singleton {
             pageIndex: 20, pageName: root.pages[20].name,
             section: Translation.tr("Arrange settings"),
             label: Translation.tr("Arrange settings"),
-            description: Translation.tr("Reorder groups, rename them, move pages between them"),
-            keywords: ["arrange", "reorder", "categories", "groups", "nav", "sidebar", "customize", "layout", "settings"]
+            description: Translation.tr("Reorder groups and pages, or hide pages from navigation"),
+            keywords: ["arrange", "reorder", "categories", "groups", "nav", "sidebar", "customize", "layout", "settings", "hide", "show", "visibility", "drag"]
         },
 
         // =====================================================================
@@ -764,6 +791,13 @@ Singleton {
             label: Translation.tr("Backdrop"),
             description: Translation.tr("Panel backdrop wallpaper and effects"),
             keywords: ["backdrop", "panel", "wallpaper", "blur", "vignette", "saturation"]
+        },
+        {
+            pageIndex: 3, pageName: root.pages[3].name,
+            section: Translation.tr("Multi-monitor"),
+            label: Translation.tr("Show entire backdrop"),
+            description: Translation.tr("Fit the full backdrop without cropping"),
+            keywords: ["backdrop", "wallpaper", "fit", "full", "entire", "crop", "zoom", "bars"]
         },
         {
             pageIndex: 3, pageName: root.pages[3].name,
@@ -1242,10 +1276,24 @@ Singleton {
         },
         {
             pageIndex: 6, pageName: root.pages[6].name,
+            section: Translation.tr("Screen recording"),
+            label: Translation.tr("Recording folder"),
+            description: Translation.tr("Choose where screen recordings are saved"),
+            keywords: ["recording", "video", "save", "path", "folder", "directory", "destination"]
+        },
+        {
+            pageIndex: 6, pageName: root.pages[6].name,
             section: Translation.tr("Region selector (screen snipping/Google Lens)"),
             label: Translation.tr("Region selector"),
             description: Translation.tr("Screenshot region selector tool"),
             keywords: ["region", "selector", "screenshot", "snip", "area", "capture"]
+        },
+        {
+            pageIndex: 6, pageName: root.pages[6].name,
+            section: Translation.tr("Region selector (screen snipping/Google Lens)"),
+            label: Translation.tr("Screenshots folder"),
+            description: Translation.tr("Choose where iNiR screenshots are saved"),
+            keywords: ["screenshot", "snip", "capture", "save", "path", "folder", "directory", "destination"]
         },
         {
             pageIndex: 6, pageName: root.pages[6].name,
@@ -1771,5 +1819,7 @@ Singleton {
         { pageIndex: 25, pageName: root.pages[25].name, section: Translation.tr("Blur and glass"), label: Translation.tr("Default blur backend"), description: Translation.tr("Let the style choose, use wallpaper glass, compositor blur, or disable blur"), keywords: ["effects", "blur", "backend", "wallpaper", "compositor", "style", "glass"] },
         { pageIndex: 25, pageName: root.pages[25].name, section: Translation.tr("Per-area overrides"), label: Translation.tr("Bars, dock, panels, islands and widgets"), description: Translation.tr("Override the blur backend independently for each shell area"), keywords: ["effects", "area", "bar", "dock", "panel", "island", "ricelin", "widget"] },
         { pageIndex: 25, pageName: root.pages[25].name, section: Translation.tr("Motion and power"), label: Translation.tr("Reduce animations"), description: Translation.tr("Use immediate reduced-motion state changes"), keywords: ["motion", "animation", "reduce", "accessibility", "performance"] }
-    ]
+        ]
+        return _staticSearchIndex
+    }
 }

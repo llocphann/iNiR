@@ -16,6 +16,7 @@ ContentPage {
 
     property bool isIiActive: Config.options?.panelFamily !== "waffle"
     property string activeSection: "source"
+    readonly property bool screensTaskActive: root.isIiActive && root.activeSection === "screens"
 
     SettingsTaskNavigator {
         visible: root.isIiActive
@@ -331,7 +332,7 @@ ContentPage {
                         height: parent.height - 28
 
                         Repeater {
-                            model: Quickshell.screens
+                            model: root.screensTaskActive ? Quickshell.screens : []
 
                             Item {
                                 id: bgMonDelegate
@@ -353,8 +354,8 @@ ContentPage {
                                     return wpPath
                                 }
 
-                                onWpPathChanged: if (WallpaperListener.isVideoPath(wpPath)) Wallpapers.ensureVideoFirstFrame(wpPath)
-                                onBackdropWpPathChanged: if (WallpaperListener.isVideoPath(backdropWpPath)) Wallpapers.ensureVideoFirstFrame(backdropWpPath)
+                                onWpPathChanged: if (root.screensTaskActive && WallpaperListener.isVideoPath(wpPath)) Wallpapers.ensureVideoFirstFrame(wpPath)
+                                onBackdropWpPathChanged: if (root.screensTaskActive && WallpaperListener.isVideoPath(backdropWpPath)) Wallpapers.ensureVideoFirstFrame(backdropWpPath)
 
                                 Layout.preferredWidth: cardWidth + backdropOffset + 4
                                 Layout.preferredHeight: parent.height - 8
@@ -405,7 +406,7 @@ ContentPage {
                                         anchors.fill: parent
                                         anchors.margins: parent.border.width
                                         fillMode: Image.PreserveAspectCrop
-                                        source: (!WallpaperListener.isVideoPath(bgMonDelegate.backdropWpPath) && !WallpaperListener.isGifPath(bgMonDelegate.backdropWpPath)) ? (bgMonDelegate.backdropWpPath || "") : ""
+                                        source: root.screensTaskActive && !WallpaperListener.isVideoPath(bgMonDelegate.backdropWpPath) && !WallpaperListener.isGifPath(bgMonDelegate.backdropWpPath) ? (bgMonDelegate.backdropWpPath || "") : ""
                                         sourceSize.width: 200
                                         sourceSize.height: 200
                                         cache: true
@@ -416,6 +417,7 @@ ContentPage {
                                         anchors.margins: parent.border.width
                                         fillMode: Image.PreserveAspectCrop
                                         source: {
+                                            if (!root.screensTaskActive) return ""
                                             if (!WallpaperListener.isGifPath(bgMonDelegate.backdropWpPath)) return ""
                                             const p = bgMonDelegate.backdropWpPath
                                             return p.startsWith("file://") ? p : "file://" + p
@@ -430,11 +432,15 @@ ContentPage {
                                         anchors.margins: parent.border.width
                                         fillMode: Image.PreserveAspectCrop
                                         source: {
+                                            if (!root.screensTaskActive) return ""
                                             const ff = Wallpapers.videoFirstFrames[bgMonDelegate.backdropWpPath]
                                             return ff ? (ff.startsWith("file://") ? ff : "file://" + ff) : ""
                                         }
                                         cache: true
-                                        Component.onCompleted: Wallpapers.ensureVideoFirstFrame(bgMonDelegate.backdropWpPath)
+                                        Component.onCompleted: {
+                                            if (root.screensTaskActive && WallpaperListener.isVideoPath(bgMonDelegate.backdropWpPath))
+                                                Wallpapers.ensureVideoFirstFrame(bgMonDelegate.backdropWpPath)
+                                        }
                                     }
 
                                     // Dim overlay for back position
@@ -552,7 +558,7 @@ ContentPage {
                                         anchors.fill: parent
                                         anchors.margins: bgMonCard.border.width
                                         fillMode: Image.PreserveAspectCrop
-                                        source: (!WallpaperListener.isVideoPath(bgMonDelegate.wpPath) && !WallpaperListener.isGifPath(bgMonDelegate.wpPath)) ? (bgMonDelegate.wpPath || "") : ""
+                                        source: root.screensTaskActive && !WallpaperListener.isVideoPath(bgMonDelegate.wpPath) && !WallpaperListener.isGifPath(bgMonDelegate.wpPath) ? (bgMonDelegate.wpPath || "") : ""
                                         sourceSize.width: 240
                                         sourceSize.height: 240
                                         cache: true
@@ -563,6 +569,7 @@ ContentPage {
                                         anchors.margins: bgMonCard.border.width
                                         fillMode: Image.PreserveAspectCrop
                                         source: {
+                                            if (!root.screensTaskActive) return ""
                                             if (!WallpaperListener.isGifPath(bgMonDelegate.wpPath)) return ""
                                             const p = bgMonDelegate.wpPath
                                             return p.startsWith("file://") ? p : "file://" + p
@@ -577,11 +584,15 @@ ContentPage {
                                         anchors.margins: bgMonCard.border.width
                                         fillMode: Image.PreserveAspectCrop
                                         source: {
+                                            if (!root.screensTaskActive) return ""
                                             const ff = Wallpapers.videoFirstFrames[bgMonDelegate.wpPath]
                                             return ff ? (ff.startsWith("file://") ? ff : "file://" + ff) : ""
                                         }
                                         cache: true
-                                        Component.onCompleted: Wallpapers.ensureVideoFirstFrame(bgMonDelegate.wpPath)
+                                        Component.onCompleted: {
+                                            if (root.screensTaskActive && WallpaperListener.isVideoPath(bgMonDelegate.wpPath))
+                                                Wallpapers.ensureVideoFirstFrame(bgMonDelegate.wpPath)
+                                        }
                                     }
 
                                     // Dim overlay when in back position
@@ -718,7 +729,7 @@ ContentPage {
                     readonly property bool isVideo: WallpaperListener.isVideoPath(_activePath)
                     readonly property bool isGif: WallpaperListener.isGifPath(_activePath)
 
-                    on_ActivePathChanged: if (isVideo) Wallpapers.ensureVideoFirstFrame(_activePath)
+                    on_ActivePathChanged: if (root.screensTaskActive && isVideo) Wallpapers.ensureVideoFirstFrame(_activePath)
 
                     ColumnLayout {
                         id: bgMonPreviewCol
@@ -736,7 +747,7 @@ ContentPage {
                                 visible: !bgMonPreviewCard.isGif && !bgMonPreviewCard.isVideo
                                 anchors.fill: parent
                                 fillMode: Image.PreserveAspectCrop
-                                source: visible ? bgMonPreviewCard.wpUrl : ""
+                                source: root.screensTaskActive && visible ? bgMonPreviewCard.wpUrl : ""
                                 sourceSize.width: 600
                                 sourceSize.height: 340
                                 cache: false
@@ -747,7 +758,7 @@ ContentPage {
                                 visible: bgMonPreviewCard.isGif
                                 anchors.fill: parent
                                 fillMode: Image.PreserveAspectCrop
-                                source: visible ? bgMonPreviewCard.wpUrl : ""
+                                source: root.screensTaskActive && visible ? bgMonPreviewCard.wpUrl : ""
                                 asynchronous: true
                                 cache: false
                                 playing: false
@@ -759,11 +770,15 @@ ContentPage {
                                 anchors.fill: parent
                                 fillMode: Image.PreserveAspectCrop
                                 source: {
+                                    if (!root.screensTaskActive) return ""
                                     const ff = Wallpapers.videoFirstFrames[bgMonPreviewCard._activePath]
                                     return ff ? (ff.startsWith("file://") ? ff : "file://" + ff) : ""
                                 }
                                 cache: false
-                                Component.onCompleted: Wallpapers.ensureVideoFirstFrame(bgMonPreviewCard._activePath)
+                                Component.onCompleted: {
+                                    if (root.screensTaskActive && bgMonPreviewCard.isVideo)
+                                        Wallpapers.ensureVideoFirstFrame(bgMonPreviewCard._activePath)
+                                }
                             }
 
                             // Bottom gradient overlay with monitor info
@@ -1515,7 +1530,7 @@ ContentPage {
                             readonly property bool isVideo: WallpaperListener.isVideoPath(wpPath)
                             readonly property string previewPath: isVideo
                                 ? Wallpapers.getVideoFirstFramePath(wpPath) : wpPath
-                            source: previewPath
+                            source: root.screensTaskActive && previewPath
                                 ? (previewPath.startsWith("file://") ? previewPath : "file://" + previewPath)
                                 : ""
                             sourceSize.width: 1200
@@ -1524,11 +1539,11 @@ ContentPage {
                             visible: status === Image.Ready
 
                             Component.onCompleted: {
-                                if (isVideo)
+                                if (root.screensTaskActive && isVideo)
                                     Wallpapers.ensureVideoFirstFrame(wpPath)
                             }
                             onWpPathChanged: {
-                                if (isVideo)
+                                if (root.screensTaskActive && isVideo)
                                     Wallpapers.ensureVideoFirstFrame(wpPath)
                             }
 
@@ -2066,6 +2081,18 @@ ContentPage {
                     }
                     StyledToolTip {
                         text: Translation.tr("Only show the backdrop, hide the main wallpaper entirely")
+                    }
+                }
+
+                SettingsSwitch {
+                    visible: (Config.options?.background?.backdrop?.enable ?? true)
+                        && (Config.options?.background?.backdrop?.hideWallpaper ?? false)
+                    buttonIcon: "fit_screen"
+                    text: Translation.tr("Show entire backdrop")
+                    checked: (Config.options?.background?.backdrop?.fillMode ?? "fill") === "fit"
+                    onCheckedChanged: Config.setNestedValue("background.backdrop.fillMode", checked ? "fit" : "fill")
+                    StyledToolTip {
+                        text: Translation.tr("Fit the full backdrop inside the screen instead of cropping it. Bars may appear when the image aspect ratio differs from the display.")
                     }
                 }
 

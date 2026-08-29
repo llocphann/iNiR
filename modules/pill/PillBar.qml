@@ -35,11 +35,10 @@ Scope {
 
     function scaleForScreen(screen): real {
         if (!screen)
-            return Math.max(0.6, root.uiScale)
+            return root.uiScale
         const shortEdge = Math.min(screen.width, screen.height)
         const resolutionScale = Math.max(0.78, Math.min(1.6, shortEdge / 1080))
-        const requested = resolutionScale * 1.1 * root.uiScale
-        return Math.max(0.6, requested)
+        return resolutionScale * 1.1 * root.uiScale
     }
 
     function setAutoHideShown(screenName: string, shown: bool): void {
@@ -128,10 +127,10 @@ Scope {
     readonly property bool floatOverWindows:
         Config.options?.bar?.pill?.floatOverWindows ?? false
 
-    function openTrayMenu(item, anchorX, hostWindow) {
+    function openTrayMenu(item, anchorX, anchorY, hostWindow) {
         trayMenu.s = hostWindow ? hostWindow.s : 1;
         trayMenu.hostWindow = hostWindow;
-        trayMenu.open(item, anchorX);
+        trayMenu.open(item, anchorX, anchorY);
     }
 
     /**
@@ -416,7 +415,7 @@ Scope {
 
                 Pill {
                     id: pill
-                    s: overlay.surfaceOpen ? Math.max(1, overlay.s) : overlay.s
+                    s: overlay.s
                     screenName: overlay.modelData ? overlay.modelData.name : ""
                     barWindow: overlay
                     surface: overlay.surface
@@ -444,7 +443,7 @@ Scope {
                         root.openSurface = name;
                     }
                     onRequestClose: root.close()
-                    onTrayMenuRequested: (item, anchorX) => root.openTrayMenu(item, anchorX, overlay)
+                    onTrayMenuRequested: (item, anchorX, anchorY) => root.openTrayMenu(item, anchorX, anchorY, overlay)
                 }
             }
         }

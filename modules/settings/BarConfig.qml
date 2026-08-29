@@ -14,6 +14,107 @@ ContentPage {
 
     property bool isIiActive: Config.options?.panelFamily !== "waffle"
     property string activeSection: "appearance"
+    property int _taskLoadingCount: 0
+
+    function activateSettingsSearchSection(section: string): bool {
+        const parts = String(section || "").toLowerCase().split(/[·›]/)
+        const label = parts[parts.length - 1].trim()
+        const sections = {
+            "appearance & layout": "appearance",
+            "sizing & surface": "appearance",
+            "m3 bar": "m3",
+            "islands options": "islands",
+            "audio spectrum": "spectrum",
+            "behavior & clock": "behavior",
+            "modules": "modules",
+            "bar module layout": "modules",
+            "resources": "modules",
+            "media": "modules",
+            "workspaces": "modules",
+            "system tray": "modules",
+            "utility buttons": "modules",
+            "notifications": "modules"
+        }
+        const target = sections[label] ?? ""
+        if (!target)
+            return false
+        root.activeSection = target
+        return true
+    }
+
+    component LazySection: Loader {
+        id: sectionLoader
+        property bool requested: false
+        property bool resident: false
+        property bool _countedLoading: false
+
+        Layout.fillWidth: true
+        asynchronous: true
+        active: resident
+        visible: requested && status !== Loader.Null
+        enabled: requested && status === Loader.Ready && opacity > 0.99
+        opacity: requested && status === Loader.Ready ? 1 : 0
+        Layout.preferredHeight: requested && status === Loader.Ready && item ? item.implicitHeight : 0
+
+        transform: Translate {
+            y: sectionLoader.requested && sectionLoader.status === Loader.Ready ? 0 : 4
+            Behavior on y {
+                enabled: Appearance.animationsEnabled
+                NumberAnimation {
+                    duration: Appearance.animation.elementMoveEnter.duration
+                    easing.type: Appearance.animation.elementMoveEnter.type
+                    easing.bezierCurve: Appearance.animation.elementMoveEnter.bezierCurve
+                }
+            }
+        }
+
+        Behavior on opacity {
+            enabled: Appearance.animationsEnabled
+            NumberAnimation {
+                duration: Appearance.animation.elementMoveEnter.duration
+                easing.type: Appearance.animation.elementMoveEnter.type
+                easing.bezierCurve: Appearance.animation.elementMoveEnter.bezierCurve
+            }
+        }
+
+        function syncLoadingState(): void {
+            const shouldCount = requested && status === Loader.Loading
+            if (shouldCount === _countedLoading)
+                return
+            root._taskLoadingCount = Math.max(0, root._taskLoadingCount + (shouldCount ? 1 : -1))
+            _countedLoading = shouldCount
+        }
+
+        onRequestedChanged: {
+            if (requested) {
+                unloadDelay.stop()
+                resident = true
+            } else if (status === Loader.Ready) {
+                unloadDelay.restart()
+            } else {
+                unloadDelay.stop()
+                resident = false
+            }
+            syncLoadingState()
+        }
+        onStatusChanged: syncLoadingState()
+        Component.onCompleted: {
+            if (requested)
+                resident = true
+            syncLoadingState()
+        }
+        Component.onDestruction: {
+            if (_countedLoading)
+                root._taskLoadingCount = Math.max(0, root._taskLoadingCount - 1)
+        }
+
+        Timer {
+            id: unloadDelay
+            interval: 600
+            repeat: false
+            onTriggered: parent.resident = false
+        }
+    }
 
     SettingsTaskNavigator {
         icon: "toolbar"
@@ -32,6 +133,11 @@ ContentPage {
             { displayName: Translation.tr("Behavior & clock"), icon: "visibility", value: "behavior" },
             { displayName: Translation.tr("Modules"), icon: "widgets", value: "modules" }
         ]
+    }
+
+    SettingsTaskLoadingState {
+        loading: root._taskLoadingCount > 0
+        text: Translation.tr("Loading section…")
     }
     property bool m3ControlsReady: false
     property bool spectrumControlsReady: false
@@ -425,10 +531,12 @@ ContentPage {
         }
     }
 
-    SettingsCardSection {
-        settingsTaskSection: "m3"
-        visible: root.isIiActive && root.activeSection === "m3"
-        expanded: true
+    LazySection {
+        requested: root.isIiActive && root.activeSection === "m3"
+        sourceComponent: Component {
+            SettingsCardSection {
+                settingsTaskSection: "m3"
+                expanded: true
         icon: "category"
         title: Translation.tr("M3 Bar")
 
@@ -1113,12 +1221,16 @@ ContentPage {
                 }
             }
         }
+            }
+        }
     }
 
-    SettingsCardSection {
-        settingsTaskSection: "islands"
-        visible: root.isIiActive && root.activeSection === "islands"
-        expanded: true
+    LazySection {
+        requested: root.isIiActive && root.activeSection === "islands"
+        sourceComponent: Component {
+            SettingsCardSection {
+                settingsTaskSection: "islands"
+                expanded: true
         icon: "linear_scale"
         title: Translation.tr("Islands options")
 
@@ -1197,6 +1309,8 @@ ContentPage {
                     font.pixelSize: Appearance.font.pixelSize.smaller
                     wrapMode: Text.WordWrap
                 }
+            }
+        }
             }
         }
     }
@@ -1297,10 +1411,12 @@ ContentPage {
         }
     }
 
-    SettingsCardSection {
-        settingsTaskSection: "spectrum"
-        visible: root.isIiActive && root.activeSection === "spectrum"
-        expanded: false
+    LazySection {
+        requested: root.isIiActive && root.activeSection === "spectrum"
+        sourceComponent: Component {
+            SettingsCardSection {
+                settingsTaskSection: "spectrum"
+                expanded: false
         icon: "graphic_eq"
         title: Translation.tr("Audio spectrum")
 
@@ -1629,12 +1745,16 @@ ContentPage {
                 }
             }
         }
+            }
+        }
     }
 
-    SettingsCardSection {
-        settingsTaskSection: "behavior"
-        visible: root.isIiActive && root.activeSection === "behavior"
-        expanded: true
+    LazySection {
+        requested: root.isIiActive && root.activeSection === "behavior"
+        sourceComponent: Component {
+            SettingsCardSection {
+                settingsTaskSection: "behavior"
+                expanded: true
         icon: "visibility"
         title: Translation.tr("Behavior & clock")
 
@@ -1999,15 +2119,19 @@ ContentPage {
                 text: Translation.tr("Vignette will hide along with the bar when auto-hide is active.")
             }
         }
+            }
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════
     // MODULES (what to show)
     // ═══════════════════════════════════════════════════════════════════
-    SettingsCardSection {
-        settingsTaskSection: "modules"
-        visible: root.isIiActive && root.activeSection === "modules"
-        expanded: false
+    LazySection {
+        requested: root.isIiActive && root.activeSection === "modules"
+        sourceComponent: Component {
+            SettingsCardSection {
+                settingsTaskSection: "modules"
+                expanded: false
         icon: "widgets"
         title: Translation.tr("Modules")
 
@@ -2190,15 +2314,19 @@ ContentPage {
                 font.pixelSize: Appearance.font.pixelSize.smaller
             }
         }
+            }
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════
     // MODULE LAYOUT (reorder / relocate)
     // ═══════════════════════════════════════════════════════════════════
-    SettingsCardSection {
-        settingsTaskSection: "modules"
-        visible: root.isIiActive && root.activeSection === "modules"
-        expanded: false
+    LazySection {
+        requested: root.isIiActive && root.activeSection === "modules"
+        sourceComponent: Component {
+            SettingsCardSection {
+                settingsTaskSection: "modules"
+                expanded: false
         icon: "reorder"
         title: Translation.tr("Bar module layout")
 
@@ -2228,15 +2356,19 @@ ContentPage {
 
             BarModuleOrderEditor {}
         }
+            }
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════
     // RESOURCES
     // ═══════════════════════════════════════════════════════════════════
-    SettingsCardSection {
-        settingsTaskSection: "modules"
-        visible: root.isIiActive && !(Config.options?.settingsUi?.easyMode ?? false) && root.activeSection === "modules"
-        expanded: false
+    LazySection {
+        requested: root.isIiActive && !(Config.options?.settingsUi?.easyMode ?? false) && root.activeSection === "modules"
+        sourceComponent: Component {
+            SettingsCardSection {
+                settingsTaskSection: "modules"
+                expanded: false
         icon: "browse_activity"
         title: Translation.tr("Resources")
 
@@ -2388,15 +2520,19 @@ ContentPage {
                 }
             }
         }
+            }
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════
     // MEDIA
     // ═══════════════════════════════════════════════════════════════════
-    SettingsCardSection {
-        settingsTaskSection: "modules"
-        visible: root.isIiActive && root.activeSection === "modules"
-        expanded: false
+    LazySection {
+        requested: root.isIiActive && root.activeSection === "modules"
+        sourceComponent: Component {
+            SettingsCardSection {
+                settingsTaskSection: "modules"
+                expanded: false
         icon: "music_note"
         title: Translation.tr("Media")
 
@@ -2423,15 +2559,19 @@ ContentPage {
                     : Translation.tr("Modern overlay at screen bottom")
             }
         }
+            }
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════
     // WORKSPACES
     // ═══════════════════════════════════════════════════════════════════
-    SettingsCardSection {
-        settingsTaskSection: "modules"
-        visible: root.isIiActive && !(Config.options?.settingsUi?.easyMode ?? false) && root.activeSection === "modules"
-        expanded: false
+    LazySection {
+        requested: root.isIiActive && !(Config.options?.settingsUi?.easyMode ?? false) && root.activeSection === "modules"
+        sourceComponent: Component {
+            SettingsCardSection {
+                settingsTaskSection: "modules"
+                expanded: false
         icon: "workspaces"
         title: Translation.tr("Workspaces")
 
@@ -2657,15 +2797,19 @@ ContentPage {
                 text: Translation.tr("Enable 'Always show numbers' to use number styles")
             }
         }
+            }
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════
     // SYSTEM TRAY
     // ═══════════════════════════════════════════════════════════════════
-    SettingsCardSection {
-        settingsTaskSection: "modules"
-        visible: root.isIiActive && root.activeSection === "modules"
-        expanded: false
+    LazySection {
+        requested: root.isIiActive && root.activeSection === "modules"
+        sourceComponent: Component {
+            SettingsCardSection {
+                settingsTaskSection: "modules"
+                expanded: false
         icon: "shelf_auto_hide"
         title: Translation.tr("System Tray")
 
@@ -2707,15 +2851,19 @@ ContentPage {
                 text: Translation.tr("System tray is disabled in Modules section above")
             }
         }
+            }
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════
     // UTILITY BUTTONS
     // ═══════════════════════════════════════════════════════════════════
-    SettingsCardSection {
-        settingsTaskSection: "modules"
-        visible: root.isIiActive && root.activeSection === "modules"
-        expanded: false
+    LazySection {
+        requested: root.isIiActive && root.activeSection === "modules"
+        sourceComponent: Component {
+            SettingsCardSection {
+                settingsTaskSection: "modules"
+                expanded: false
         icon: "build"
         title: Translation.tr("Utility Buttons")
 
@@ -2847,15 +2995,19 @@ ContentPage {
                 }
             }
         }
+            }
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════
     // NOTIFICATIONS
     // ═══════════════════════════════════════════════════════════════════
-    SettingsCardSection {
-        settingsTaskSection: "modules"
-        visible: root.isIiActive && root.activeSection === "modules"
-        expanded: false
+    LazySection {
+        requested: root.isIiActive && root.activeSection === "modules"
+        sourceComponent: Component {
+            SettingsCardSection {
+                settingsTaskSection: "modules"
+                expanded: false
         icon: "notifications"
         title: Translation.tr("Notifications")
 
@@ -2868,6 +3020,8 @@ ContentPage {
                 StyledToolTip {
                     text: Translation.tr("Show number instead of just a dot")
                 }
+            }
+        }
             }
         }
     }

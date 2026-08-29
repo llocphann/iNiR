@@ -15,6 +15,7 @@ ContentPage {
     settingsPageIndex: 12
     settingsPageName: Translation.tr("Compositor")
     property string activeSection: "displays"
+    property bool pageReady: false
 
     property var outputList: []
     property int selectedOutputIndex: 0
@@ -356,6 +357,25 @@ ContentPage {
         loadCustomizations()
     }
 
+    function refreshActiveSection(): void {
+        switch (root.activeSection) {
+        case "displays": loadOutputs(); break
+        case "input":
+            loadInput()
+            loadCursorThemes()
+            break
+        case "layout": loadLayout(); break
+        case "animations": loadAnimations(); break
+        case "rules": loadWindowRules(); break
+        }
+    }
+
+    function refreshInitial(): void {
+        loadValidation()
+        loadCustomizations()
+        refreshActiveSection()
+    }
+
     function getConfigValue(path, fallback) {
         const parts = String(path ?? "").split(".")
         let cursor = Config.options
@@ -626,7 +646,13 @@ ContentPage {
     }
 
     Component.onCompleted: {
-        refreshAll()
+        root.pageReady = true
+        root.refreshInitial()
+    }
+
+    onActiveSectionChanged: {
+        if (root.pageReady)
+            root.refreshActiveSection()
     }
 
     onCurrentOutputChanged: armPositionEditor()

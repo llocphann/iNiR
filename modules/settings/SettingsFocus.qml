@@ -226,7 +226,7 @@ Scope {
         }
 
         // Static section index — coarse targets, ranked below real controls.
-        var index = SettingsPageRegistry.staticSearchIndex;
+        var index = SettingsPageRegistry.searchIndex();
         for (var i = 0; i < index.length; i++) {
             var e = index[i];
             if (!allowed(e.pageIndex))
@@ -326,6 +326,12 @@ Scope {
     function _trySpotlight(): void {
         if (root._pendingOptionId < 0 && root._pendingSection.length === 0)
             return;
+
+        const pageItem = pageHost.currentItem
+        if (pageItem && pageHost.currentIndex === root._pendingPageIndex
+                && root._pendingSection.length > 0
+                && typeof pageItem.activateSettingsSearchSection === "function")
+            pageItem.activateSettingsSearchSection(root._pendingSection)
 
         var control = root._pendingOptionId >= 0
             ? SettingsSearchRegistry.getControlById(root._pendingOptionId)
@@ -2041,9 +2047,10 @@ Scope {
 
                             pages: root.pages
                             requestedIndex: root.currentPage
-                            // Stays enabled at level 0 so the LRU keeps recently
-                            // visited pages warm across home ↔ page navigation.
-                            loadEnabled: Config.ready
+                            // Keep recently visited pages warm while Settings is open,
+                            // including home ↔ page navigation, but release them when
+                            // the Settings surface itself closes.
+                            loadEnabled: Config.ready && root.settingsOpen
 
                             // Same soft scroll edge as the home grid. Read through
                             // `var`, not the host's Item-typed currentItem, because
@@ -2083,22 +2090,11 @@ Scope {
                                 }
                             }
 
-                            CircularProgress {
-                                anchors.centerIn: parent
-                                z: 10
-                                readonly property bool isLoading: pageHost.loading
-                                opacity: isLoading ? 1 : 0
-                                scale: isLoading ? 1 : 0.7
-                                visible: opacity > 0
-
-                                Behavior on opacity {
-                                    enabled: Appearance.animationsEnabled
-                                    animation: NumberAnimation { duration: Appearance.animation.elementMoveFast.duration }
-                                }
-                                Behavior on scale {
-                                    enabled: Appearance.animationsEnabled
-                                    animation: NumberAnimation { duration: Appearance.animation.elementMoveFast.duration }
-                                }
+                            SettingsPageLoadingOverlay {
+                                anchors.fill: parent
+                                loading: pageHost.loading
+                                text: Translation.tr("Loading page…")
+                                z: 15
                             }
                         }
                     }

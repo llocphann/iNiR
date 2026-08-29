@@ -264,6 +264,7 @@ Item {
                 Loader {
                     Layout.fillWidth: true
                     active: root.showMediaSection
+                    asynchronous: true
                     opacity: root.regaliaEverywhere || root._entranceCascade >= 2 ? 1 : 0
                     Behavior on opacity { enabled: Appearance.animationsEnabled && !root.regaliaEverywhere; NumberAnimation { duration: Appearance.animation.elementMoveFast.duration; easing.type: Easing.OutCubic } }
                     sourceComponent: Component { MediaSection {} }
@@ -273,6 +274,7 @@ Item {
                 Loader {
                     Layout.fillWidth: true
                     active: root.showWallpaperSection
+                    asynchronous: true
                     opacity: root.regaliaEverywhere || root._entranceCascade >= 3 ? 1 : 0
                     Behavior on opacity { enabled: Appearance.animationsEnabled && !root.regaliaEverywhere; NumberAnimation { duration: Appearance.animation.elementMoveFast.duration; easing.type: Easing.OutCubic } }
                     sourceComponent: Component { WallpaperSection {} }
@@ -282,6 +284,7 @@ Item {
                 Loader {
                     Layout.fillWidth: true
                     active: root.showWeatherSection
+                    asynchronous: true
                     opacity: root.regaliaEverywhere || root._entranceCascade >= 4 ? 1 : 0
                     Behavior on opacity { enabled: Appearance.animationsEnabled && !root.regaliaEverywhere; NumberAnimation { duration: Appearance.animation.elementMoveFast.duration; easing.type: Easing.OutCubic } }
                     sourceComponent: Component { WeatherSection {} }
@@ -291,6 +294,7 @@ Item {
                 Loader {
                     Layout.fillWidth: true
                     active: root.showSystemSection
+                    asynchronous: true
                     opacity: root.regaliaEverywhere || root._entranceCascade >= 5 ? 1 : 0
                     Behavior on opacity { enabled: Appearance.animationsEnabled && !root.regaliaEverywhere; NumberAnimation { duration: Appearance.animation.elementMoveFast.duration; easing.type: Easing.OutCubic } }
                     sourceComponent: Component { SystemSection {} }
@@ -300,6 +304,7 @@ Item {
                 Loader {
                     Layout.fillWidth: true
                     active: root.showSlidersSection
+                    asynchronous: true
                     opacity: root.regaliaEverywhere || root._entranceCascade >= 6 ? 1 : 0
                     Behavior on opacity { enabled: Appearance.animationsEnabled && !root.regaliaEverywhere; NumberAnimation { duration: Appearance.animation.elementMoveFast.duration; easing.type: Easing.OutCubic } }
                     sourceComponent: Component { SlidersSection {} }
@@ -309,6 +314,7 @@ Item {
                 Loader {
                     Layout.fillWidth: true
                     active: root.showQuickActionsSection
+                    asynchronous: true
                     opacity: root.regaliaEverywhere || root._entranceCascade >= 7 ? 1 : 0
                     Behavior on opacity { enabled: Appearance.animationsEnabled && !root.regaliaEverywhere; NumberAnimation { duration: Appearance.animation.elementMoveFast.duration; easing.type: Easing.OutCubic } }
                     sourceComponent: Component { QuickActionsSection {} }

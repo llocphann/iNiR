@@ -1618,7 +1618,8 @@ ContentPage {
         SettingsGroup {
             Loader {
                 Layout.fillWidth: true
-                active: auroraStyleEditorSection.expanded && Appearance.auroraEverywhere && !Appearance.angelEverywhere
+                active: root.activeSection === "style" && auroraStyleEditorSection.expanded
+                    && Appearance.auroraEverywhere && !Appearance.angelEverywhere
                 source: "AuroraStyleEditor.qml"
             }
         }
@@ -1635,7 +1636,8 @@ ContentPage {
         SettingsGroup {
             Loader {
                 Layout.fillWidth: true
-                active: angelStyleEditorSection.expanded && Appearance.angelEverywhere
+                active: root.activeSection === "style" && angelStyleEditorSection.expanded
+                    && Appearance.angelEverywhere
                 source: "AngelStyleEditor.qml"
             }
         }
@@ -1652,7 +1654,8 @@ ContentPage {
         SettingsGroup {
             Loader {
                 Layout.fillWidth: true
-                active: regaliaStyleEditorSection.expanded && Appearance.regaliaEverywhere
+                active: root.activeSection === "style" && regaliaStyleEditorSection.expanded
+                    && Appearance.regaliaEverywhere
                 source: "RegaliaStyleEditor.qml"
             }
         }
@@ -1669,7 +1672,8 @@ ContentPage {
         SettingsGroup {
             Loader {
                 Layout.fillWidth: true
-                active: zzzStyleEditorSection.expanded && Appearance.zzzEverywhere
+                active: root.activeSection === "style" && zzzStyleEditorSection.expanded
+                    && Appearance.zzzEverywhere
                 source: "ZzzStyleEditor.qml"
             }
         }
@@ -1686,7 +1690,9 @@ ContentPage {
         SettingsGroup {
             Loader {
                 Layout.fillWidth: true
-                active: customThemeEditorSection.expanded
+                active: root.activeSection === "advanced"
+                    && !(Config.options?.settingsUi?.easyMode ?? false)
+                    && customThemeEditorSection.expanded
                 source: "CustomThemeEditor.qml"
             }
         }
@@ -1703,7 +1709,9 @@ ContentPage {
         SettingsGroup {
             Loader {
                 Layout.fillWidth: true
-                active: gowallEditorSection.expanded
+                active: root.activeSection === "advanced"
+                    && !(Config.options?.settingsUi?.easyMode ?? false)
+                    && gowallEditorSection.expanded
                 source: "GowallWallpaperEditor.qml"
             }
         }
