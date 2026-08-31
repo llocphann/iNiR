@@ -52,8 +52,7 @@ QtObject {
         const hidden = Array.isArray(saved?.hidden) ? saved.hidden : []
         let hasLegacyTlpIndex = false
         let hasCurrentTlpIndex = false
-
-        function inspectIndex(index): void {
+        const inspectIndex = index => {
             if (index === 27)
                 hasLegacyTlpIndex = true
             else if (index === 28)
