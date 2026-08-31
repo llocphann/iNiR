@@ -9,7 +9,7 @@ import qs.modules.common.widgets
 ContentPage {
     id: root
 
-    settingsPageIndex: 27
+    settingsPageIndex: 28
     settingsPageName: Translation.tr("Battery")
 
     property int selectedCategoryIndex: 0
