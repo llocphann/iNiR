@@ -279,7 +279,10 @@ Item {
             _reset()
     }
     onCacheLimitChanged: _trimCache()
-    Component.onCompleted: Qt.callLater(root._requestPage)
+    Component.onCompleted: {
+        SettingsArrangement.migrateLegacyPageIndices()
+        Qt.callLater(root._requestPage)
+    }
 
     Repeater {
         id: pageRepeater
