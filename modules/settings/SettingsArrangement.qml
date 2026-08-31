@@ -7,6 +7,8 @@ import qs.modules.common
 QtObject {
     id: root
 
+    readonly property int layoutSchemaVersion: 3
+
     function snapshot(): var {
         return ({
             groups: SettingsPageRegistry.categories.map(c => ({
@@ -18,7 +20,72 @@ QtObject {
     }
 
     function save(snapshot): void {
-        Config.setNestedValue("settingsUi.categories", JSON.stringify(snapshot))
+        Config.setNestedValue("settingsUi.categories", JSON.stringify({
+            version: root.layoutSchemaVersion,
+            groups: snapshot.groups,
+            hidden: snapshot.hidden
+        }))
+    }
+
+    function migrateLegacyPageIndices(): void {
+        const raw = Config.options?.settingsUi?.categories ?? ""
+        if (typeof raw !== "string" || raw.length === 0)
+            return
+
+        let saved
+        try {
+            saved = JSON.parse(raw)
+        } catch (e) {
+            return
+        }
+
+        if (!Array.isArray(saved)
+                && Number(saved?.version ?? 0) >= root.layoutSchemaVersion)
+            return
+
+        const groups = Array.isArray(saved)
+            ? saved
+            : (Array.isArray(saved?.groups) ? saved.groups : null)
+        if (!groups)
+            return
+
+        const hidden = Array.isArray(saved?.hidden) ? saved.hidden : []
+        let hasLegacyTlpIndex = false
+        let hasCurrentTlpIndex = false
+
+        function inspectIndex(index): void {
+            if (index === 27)
+                hasLegacyTlpIndex = true
+            else if (index === 28)
+                hasCurrentTlpIndex = true
+        }
+
+        for (const group of groups) {
+            if (!group || !Array.isArray(group.pages))
+                continue
+            group.pages.forEach(inspectIndex)
+        }
+        hidden.forEach(inspectIndex)
+
+        const shouldRemapTlp = hasLegacyTlpIndex && !hasCurrentTlpIndex
+        const migratedGroups = groups.map(group => {
+            if (!group || typeof group.label !== "string")
+                return group
+            return ({
+                label: group.label,
+                pages: (Array.isArray(group.pages) ? group.pages : [])
+                    .map(index => shouldRemapTlp && index === 27 ? 28 : index)
+            })
+        })
+        const migratedHidden = hidden
+            .map(index => shouldRemapTlp && index === 27 ? 28 : index)
+
+        // Pre-Orbit fork layouts used index 27 for Battery/TLP. Orbit now owns
+        // 27 and Battery/TLP moved to 28, so preserve the user's old placement
+        // or hidden state. A newly added Orbit page is intentionally left
+        // missing; SettingsPageRegistry will surface it in the trailing More
+        // group, matching the existing behavior for newly introduced pages.
+        root.save({ groups: migratedGroups, hidden: migratedHidden })
     }
 
     function removePage(snapshot, categoryIndex: int, pageIndex: int, pageIdx: int): int {
