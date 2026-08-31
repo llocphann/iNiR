@@ -1295,6 +1295,8 @@ Singleton {
                         property string shape: "Cookie4Sided"
                         property string fitMode: "cover"
                         property int size: 220
+                        property int contentWidth: 0
+                        property int contentHeight: 0
                         property int dim: 0
                         property int widgetScale: 100
                         property int widgetOpacity: 100
@@ -2579,6 +2581,135 @@ Singleton {
                 }
             }
 
+            property JsonObject orbit: JsonObject {
+                property bool enable: true
+                property string stageMode: "stage" // "stage" | "orbital"
+                property bool backdropBlurEnable: true
+                property string backdropBlurMode: "" // "" | "shell" | "off"; legacy inherit/niri resolve to shell
+                property int backdropBlurStrength: 72
+                property int backdropBlurSaturation: 18
+                property int backdropBlurTint: 28
+                property bool hotCornerEnable: true
+                property string hotCorner: "topRight"
+                property int hotCornerSize: 12
+                property int hotCornerActivationDistance: 2
+                property int hotCornerDwellMs: 0
+                property int workspaceCount: 3
+                property int workspaceScalePercent: 27
+                property int maxPanelWidthPercent: 92
+                property int workspaceSpacing: 18
+                property int windowGap: 4
+                property string windowLabels: "hover" // "hover" | "always" | "off"
+                property bool windowLabelIcons: true
+                property int scrimDim: 35
+                property bool showWorkspaceNumbers: true
+                property bool balancedGrid: true
+                property bool closeOnSelect: true
+                property bool keyboardNavigation: true
+                property bool scrollNavigation: true
+                property int scrollSteps: 1
+                property bool scrollSwitchWorkspace: true
+                property bool scrollWrapAround: false
+                property bool canvasScrubNavigation: true
+                property int canvasScrubThreshold: 96
+                property string userPresetJson: ""
+                property JsonObject studio: JsonObject {
+                    property string surfaceStyle: "ricelin" // "current" | "ricelin"
+                    property int widthPercent: 26
+                    property string density: "compact" // "compact" | "comfortable"
+                    property bool showDescriptions: true
+                }
+                property JsonObject presentation: JsonObject {
+                    property string preset: "adaptive" // "adaptive" | "soft" | "float" | "sweep" | "instant"
+                    property bool advanced: false
+                    property string entryStyle: "cascade" // "fade" | "drift" | "cascade" | "instant"
+                    property string direction: "top" // "center" | "top" | "bottom" | "left" | "right"
+                    property int distance: 92
+                    property int enterDurationMs: 300
+                    property int exitDurationMs: 220
+                    property int entryDelayMs: 64
+                    property int entryStaggerMs: 42
+                    property int shelfDelayMs: 72
+                    property int entryOpacityPercent: 0
+                }
+                property JsonObject navigationMotion: JsonObject {
+                    property string preset: "fluid" // "snappy" | "fluid" | "cinematic" | "instant" | "custom"
+                    property bool advanced: false
+                    property int durationMs: 320
+                    property string easing: "smooth" // "direct" | "smooth" | "linear"
+                }
+                property bool showTrail: true
+                property int trailItems: 5
+                property bool showStash: true
+                property bool showNewWorkspaceDrop: true
+                property string stashRestoreMode: "original"
+                property JsonObject orbital: JsonObject {
+                    property string layout: "orbit" // "orbit" | "horizon" | "gallery" | "deck" | "atlas"
+                    property int visibleWorkspaces: 5
+                    property int coreSizePercent: 48
+                    property int satelliteSizePercent: 42
+                    property int horizontalSpreadPercent: 82
+                    property int verticalSpreadPercent: 58
+                    property int depthPercent: 18
+                    property JsonObject surface: JsonObject {
+                        property string style: "current" // "current" | "ricelin"
+                        property bool outline: true
+                        property int outlineWidth: 1
+                        property int outlineOpacityPercent: 72
+                        property int frameInset: 5
+                        property string shadowMode: "core" // "off" | "core" | "all"
+                        property int shadowOpacityPercent: 72
+                        property int coreElevation: 2
+                        property int satelliteElevation: 1
+                        property int radiusPercent: 100
+                    }
+                    property JsonObject geometry: JsonObject {
+                        property bool advanced: false
+                        property int edgePadding: 10
+                        property int horizonGap: 12
+                        property int horizonInset: 24
+                        property int horizonVerticalBase: 8
+                        property int horizonVerticalRange: 26
+                        property int galleryBaseGap: 34
+                        property int galleryRowGap: 14
+                        property int deckBaseGap: 26
+                        property int deckStep: 44
+                        property int deckLiftStep: 24
+                        property int atlasGap: 14
+                        property int atlasColumns: 3
+                        property int atlasCoreBoostPercent: 10
+                        property int coreContentMargin: 9
+                        property int satelliteContentMargin: 6
+                    }
+                    property bool satellitePreviews: true
+                    property string satelliteClickAction: "select" // "select" | "enter"
+                    property bool showWorkspaceLabels: true
+                    property string workspaceLabelMode: "" // "" preserves legacy showWorkspaceLabels; index | name | workspace | full | off
+                    property bool showWorkspaceWallpaper: true
+                    property int workspaceWallpaperOpacity: 70
+                }
+                property JsonObject pocket: JsonObject {
+                    property string layout: "cards"
+                    property bool showPreviews: true
+                }
+                property JsonObject shelf: JsonObject {
+                    property bool enable: true
+                    property bool showStudioButton: true
+                    property string layout: "islands" // "bar" | "islands" | "minimal"
+                    property string density: "comfortable" // "comfortable" | "compact"
+                    property string labels: "auto" // "auto" | "always" | "icons"
+                    property string islandStyle: "material" // "material" | "ricelin"
+                    property int moduleSpacing: 7
+                    property int islandPadding: 8
+                    property string trailScope: "output" // "output" | "workspace"
+                    property string locatorLabel: "auto" // "auto" | "index" | "name"
+                    property list<string> modules: ["locator", "trail", "niri", "actions", "stash"]
+                    property list<string> niriActions: ["maximize", "consume", "expel"]
+                    property list<string> pinnedActions: ["open-clipboard", "toggle-tiling", "toggle-dashboard"]
+                    property bool closeOnAction: true
+                }
+            }
+
             // Settings for the custom Alt-Tab switcher in ii
             property JsonObject altSwitcher: JsonObject {
                 // Preset style: "default" (sidebar) or "list" (centered list)
@@ -2739,6 +2870,10 @@ Singleton {
                     property bool allowNsfw: false
                     property string defaultProvider: "yandere"
                     property int limit: 20
+                    property JsonObject gelbooru: JsonObject {
+                        property string apiKey: ""
+                        property string userId: ""
+                    }
                     property JsonObject zerochan: JsonObject {
                         property string username: "[unset]"
                     }

@@ -19,7 +19,7 @@ ContentPage {
     property string activeSection: "wallpaper"
     property string captureFolderTarget: "recordings"
     readonly property string effectiveRecordingPath: {
-        const configured = Config.options?.screenRecord?.savePath ?? ""
+        const configured = String(Config.getNestedValue("screenRecord.savePath", ""))
         return configured.length > 0 ? configured : Directories.videosPath
     }
     readonly property string effectiveScreenshotPath: Directories.screenshotsPath

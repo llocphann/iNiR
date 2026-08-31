@@ -21,11 +21,18 @@ Singleton {
     property string focusedWorkspaceId: ""
     property var currentOutputWorkspaces: []
     property string currentOutput: ""
+    readonly property bool actionReady: requestSocket.connected
 
     // Config load status (updated from ConfigLoaded event)
     property bool configLoaded: false
     property bool configLoadFailed: false
     property string configError: ""
+    property var overviewHotCornersGlobal: ["topLeft"]
+    property var overviewHotCornersByOutput: ({})
+    property var overviewHotCornerOverrides: ({})
+    property bool overviewHotCornersReady: false
+    property string overviewHotCornersError: ""
+    property bool _overviewHotCornersRefreshQueued: false
 
     signal configLoadFinished(bool ok, string error)
 
@@ -70,6 +77,7 @@ Singleton {
             if (connected) {
                 send('"EventStream"')
                 fetchOutputs()
+                refreshOverviewHotCorners()
             }
         }
 
@@ -114,6 +122,41 @@ Singleton {
         }
     }
 
+    Process {
+        id: overviewHotCornersProcess
+        command: [
+            "/usr/bin/python3",
+            Quickshell.shellPath("scripts/niri-config.py"),
+            "get-hot-corners"
+        ]
+
+        stdout: StdioCollector { id: overviewHotCornersCollector }
+
+        onExited: exitCode => {
+            if (exitCode === 0) {
+                try {
+                    const data = JSON.parse(overviewHotCornersCollector.text)
+                    root.overviewHotCornersGlobal = Array.isArray(data.global)
+                        ? data.global : ["topLeft"]
+                    root.overviewHotCornerOverrides = data.overrides ?? ({})
+                    root.overviewHotCornersByOutput = data.effective ?? ({})
+                    root.overviewHotCornersReady = true
+                    root.overviewHotCornersError = ""
+                } catch (e) {
+                    root.overviewHotCornersError = String(e)
+                }
+            } else {
+                root.overviewHotCornersError = "get-hot-corners exited " + exitCode
+            }
+
+            if (root._overviewHotCornersRefreshQueued) {
+                root._overviewHotCornersRefreshQueued = false
+                overviewHotCornersProcess.running = true
+            }
+        }
+    }
+
+
     // Debounce timer for fetchOutputs
     Timer {
         id: fetchOutputsDebounce
@@ -136,6 +179,31 @@ Singleton {
         if (!CompositorService.isNiri)
             return
         fetchOutputsDebounce.restart()
+    }
+
+    function refreshOverviewHotCorners(): void {
+        if (!CompositorService.isNiri)
+            return
+        if (overviewHotCornersProcess.running) {
+            root._overviewHotCornersRefreshQueued = true
+            return
+        }
+        overviewHotCornersProcess.running = true
+    }
+
+    function overviewHotCornersForOutput(outputName: string): var {
+        const configured = root.overviewHotCornersByOutput?.[outputName]
+        if (Array.isArray(configured))
+            return configured
+        const exactOverride = root.overviewHotCornerOverrides?.[outputName]
+        if (Array.isArray(exactOverride))
+            return exactOverride
+        return Array.isArray(root.overviewHotCornersGlobal)
+            ? root.overviewHotCornersGlobal : ["topLeft"]
+    }
+
+    function isOverviewHotCornerActive(outputName: string, cornerName: string): bool {
+        return root.overviewHotCornersForOutput(outputName).includes(cornerName)
     }
 
     // Schedule a single-window check for a specific workspace after niri settles focus
@@ -661,6 +729,9 @@ Singleton {
         configLoaded = !failed
         configLoadFailed = !!failed
         configError = (failed && data && data.error) ? data.error : ""
+
+        if (!failed)
+            refreshOverviewHotCorners()
 
         configLoadFinished(!failed, configError)
     }

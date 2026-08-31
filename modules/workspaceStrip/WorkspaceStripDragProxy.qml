@@ -26,23 +26,39 @@ Item {
     property string title: ""
     property string appId: ""
 
-    width: 168
-    height: 40
+    // Optional visual overrides for other shell surfaces reusing the proven
+    // drag lifecycle. Defaults preserve WorkspaceStrip exactly.
+    property color surfaceColor: proxy._zzz ? Appearance.zzz.bg3 : Appearance.colors.colLayer3
+    property color outlineColor: proxy._zzz ? Appearance.zzz.accent
+        : ColorUtils.transparentize(Appearance.colors.colPrimary, 0.4)
+    property color foregroundColor: proxy._zzz ? Appearance.zzz.onColor : Appearance.colors.colOnLayer3
+    property real cornerRadius: proxy._zzz ? Appearance.zzz.controlRadius : Appearance.rounding.small
+    property real surfaceOpacity: 0.95
+    property bool previewEnabled: false
+    property string previewSource: ""
+    property real compactWidth: 168
+    property real compactHeight: 40
+    property real previewWidth: 196
+    property real previewHeight: 118
+    property bool centerOnPointer: false
+
+    width: previewEnabled ? previewWidth : compactWidth
+    height: previewEnabled ? previewHeight : compactHeight
     visible: dragging
     z: 10000
 
     Drag.active: dragging
     Drag.source: proxy
     Drag.keys: [dragKey]
-    Drag.hotSpot.x: 0
-    Drag.hotSpot.y: 0
+    Drag.hotSpot.x: centerOnPointer ? width / 2 : 0
+    Drag.hotSpot.y: centerOnPointer ? height / 2 : 0
 
     readonly property bool _zzz: Appearance.zzzEverywhere
 
     function _moveUnderPointer(src: Item, mx: real, my: real): void {
         if (!parent) return
         const p = src.mapToItem(parent, mx, my)
-        proxy.x = p.x
+        proxy.x = centerOnPointer ? p.x - width / 2 : p.x
         proxy.y = p.y - height / 2
     }
 
@@ -80,14 +96,14 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        radius: proxy._zzz ? Appearance.zzz.controlRadius : Appearance.rounding.small
-        color: proxy._zzz ? Appearance.zzz.bg3 : Appearance.colors.colLayer3
+        radius: proxy.cornerRadius
+        color: proxy.surfaceColor
         border.width: 1
-        border.color: proxy._zzz ? Appearance.zzz.accent
-            : ColorUtils.transparentize(Appearance.colors.colPrimary, 0.4)
-        opacity: 0.95
+        border.color: proxy.outlineColor
+        opacity: proxy.surfaceOpacity
 
         Row {
+            visible: !proxy.previewEnabled
             anchors {
                 left: parent.left
                 right: parent.right
@@ -111,7 +127,75 @@ Item {
                 elide: Text.ElideRight
                 maximumLineCount: 1
                 font.pixelSize: Appearance.font.pixelSize.small
-                color: proxy._zzz ? Appearance.zzz.onColor : Appearance.colors.colOnLayer3
+                color: proxy.foregroundColor
+            }
+        }
+
+        ClippingRectangle {
+            visible: proxy.previewEnabled
+            anchors.fill: parent
+            anchors.margins: 3
+            radius: Math.max(2, proxy.cornerRadius - 3)
+            color: proxy.surfaceColor
+
+            Image {
+                id: previewImage
+                anchors.fill: parent
+                source: proxy.previewSource
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+                smooth: true
+                mipmap: true
+                visible: status === Image.Ready
+            }
+
+            Rectangle {
+                anchors.fill: parent
+                visible: !previewImage.visible
+                color: proxy.surfaceColor
+
+                IconImage {
+                    anchors.centerIn: parent
+                    implicitSize: 34
+                    source: proxy.appId.length > 0 ? AppSearch.getIconSource(proxy.appId) : ""
+                }
+            }
+
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: 30
+                color: ColorUtils.applyAlpha(proxy.surfaceColor, 0.92)
+
+                Row {
+                    anchors {
+                        left: parent.left
+                        right: parent.right
+                        verticalCenter: parent.verticalCenter
+                        leftMargin: 8
+                        rightMargin: 8
+                    }
+                    spacing: 7
+
+                    IconImage {
+                        anchors.verticalCenter: parent.verticalCenter
+                        implicitSize: 18
+                        source: proxy.appId.length > 0 ? AppSearch.getIconSource(proxy.appId) : ""
+                    }
+
+                    StyledText {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Math.max(0, parent.width - 28)
+                        text: proxy.title
+                        renderType: Text.QtRendering
+                        font.hintingPreference: Font.PreferNoHinting
+                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        color: proxy.foregroundColor
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+                    }
+                }
             }
         }
     }

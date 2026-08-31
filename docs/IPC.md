@@ -76,6 +76,39 @@ bind "Mod+Space" { spawn "inir" "overview" "toggle"; }
 
 ---
 
+### orbit
+
+Niri-only Material session navigator for the ii family. Orbit presents nearby workspaces and readable window previews, with MRU Trail navigation and temporary Stash parking.
+
+| Function | Description |
+|----------|-------------|
+| `toggle` | Open/close Orbit |
+| `open` | Open Orbit on the focused output |
+| `close` | Close Orbit if it is active |
+| `pocket` | Open Orbit directly into Pocket |
+| `studio` | Open Orbit directly into the live Studio editor |
+| `find` | Open Orbit Focus Lens and filter session windows by app or title |
+| `stage` | Open Orbit in the classic Stage view for this session |
+| `orbital` | Open Orbit in the Orbital workspace view for this session |
+| `next` | Switch Niri to the next workspace while Orbit stays open |
+| `previous` | Switch Niri to the previous workspace while Orbit stays open |
+| `status` | Print the effective Orbit runtime state used by diagnostics and visual audits |
+| `toggleView` | Switch the open Orbit session between Stage and Orbital |
+
+---
+
+### taskview
+
+Compatibility entry point for task navigation. On Waffle it opens the Waffle Task View; on ii/Niri it routes to Orbit.
+
+| Function | Description |
+|----------|-------------|
+| `toggle` | Open/close the active family's task navigator |
+| `open` | Open the active family's task navigator |
+| `close` | Close the active family's task navigator |
+
+---
+
 ### workspaceStrip
 
 Workspace edge strip. Shows a compact per-workspace rail and expands it for switching without opening the full overview.
@@ -749,7 +782,9 @@ Window minimization (Niri workaround - moves windows to hidden workspace).
 | Function | Description |
 |----------|-------------|
 | `minimize` | Minimize focused window |
+| `minimizeId` | Minimize a window by Niri window ID |
 | `restore` | Restore a minimized window by ID |
+| `restoreOriginal` | Restore a minimized window to the workspace it came from |
 
 ---
 
@@ -857,18 +892,6 @@ Waffle taskbar visibility.
 | `toggle` | Show/hide taskbar |
 | `open` | Show taskbar |
 | `close` | Hide taskbar |
-
----
-
-### taskview
-
-Waffle task view (Win+Tab style).
-
-| Function | Description |
-|----------|-------------|
-| `toggle` | Open/close task view |
-| `open` | Show task view |
-| `close` | Hide task view |
 
 ---
 

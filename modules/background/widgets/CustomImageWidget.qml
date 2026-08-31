@@ -30,13 +30,15 @@ AbstractBackgroundWidget {
         shape: "Cookie4Sided",
         fitMode: "cover",
         size: 220,
+        contentWidth: 0,
+        contentHeight: 0,
         dim: 0,
         widgetScale: 100,
         widgetOpacity: 100,
         x: 120,
         y: 320
     })
-    resizableAxes: ({ uniform: "size" })
+    resizableAxes: ({ width: "contentWidth", height: "contentHeight" })
 
     readonly property string sourceMode: root._readConfigKey("sourceMode") === "folder" ? "folder" : "file"
     readonly property string mediaPath: String(root._readConfigKey("path") ?? "")
@@ -55,7 +57,16 @@ AbstractBackgroundWidget {
     readonly property string fitMode:
         root._readConfigKey("fitMode") === "contain" ? "contain" : "cover"
     readonly property real logicalSize: Math.max(80, Number(root._readConfigKey("size") ?? 220))
-    readonly property real renderedSize: Math.round(root.logicalSize * root.scaleFactor)
+    readonly property real logicalWidth: {
+        const value = Number(root._readConfigKey("contentWidth") ?? 0)
+        return value > 0 ? Math.max(80, value) : root.logicalSize
+    }
+    readonly property real logicalHeight: {
+        const value = Number(root._readConfigKey("contentHeight") ?? 0)
+        return value > 0 ? Math.max(80, value) : root.logicalSize
+    }
+    readonly property real renderedWidth: Math.round(root.logicalWidth * root.scaleFactor)
+    readonly property real renderedHeight: Math.round(root.logicalHeight * root.scaleFactor)
     readonly property int effectiveTransitionDuration: root.animationsActive
         ? Appearance.calcEffectiveDuration(root.transitionDuration) : 0
     property var mediaPaths: []
@@ -86,8 +97,8 @@ AbstractBackgroundWidget {
 
     property bool dropHover: false
 
-    implicitWidth: root.renderedSize
-    implicitHeight: root.renderedSize
+    implicitWidth: root.renderedWidth
+    implicitHeight: root.renderedHeight
 
     function fileUrl(path: string): string {
         const value = String(path ?? "")
@@ -781,7 +792,7 @@ AbstractBackgroundWidget {
             visible: root.currentPath.length === 0 || root.activeFailed
             text: root.activeFailed ? "broken_image" : (root.dropHover ? "download" : "perm_media")
             fill: root.dropHover ? 1 : 0
-            iconSize: Math.max(28, Math.round(root.renderedSize * 0.24))
+            iconSize: Math.max(28, Math.round(Math.min(root.renderedWidth, root.renderedHeight) * 0.24))
             color: root.widgetSemanticOnContainer(root.widgetPrimaryRole)
         }
 

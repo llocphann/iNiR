@@ -750,6 +750,39 @@ ContentPage {
 
 
             ContentSubsection {
+                title: Translation.tr("Gelbooru")
+                visible: (Config.options?.policies?.weeb ?? 0) !== 0
+
+                StyledText {
+                    Layout.fillWidth: true
+                    text: Translation.tr("Gelbooru currently requires account API credentials for API access.")
+                    wrapMode: Text.Wrap
+                    color: Appearance.colors.colSubtext
+                    font.pixelSize: Appearance.font.pixelSize.smaller
+                }
+
+                ConfigRow {
+                    Layout.fillWidth: true
+                    spacing: 6
+
+                    MaterialTextField {
+                        Layout.fillWidth: true
+                        placeholderText: Translation.tr("User ID")
+                        text: Config.options?.sidebar?.booru?.gelbooru?.userId ?? ""
+                        onEditingFinished: Config.setNestedValue("sidebar.booru.gelbooru.userId", text.trim())
+                    }
+
+                    MaterialTextField {
+                        Layout.fillWidth: true
+                        placeholderText: Translation.tr("API key")
+                        echoMode: TextInput.Password
+                        text: Config.options?.sidebar?.booru?.gelbooru?.apiKey ?? ""
+                        onEditingFinished: Config.setNestedValue("sidebar.booru.gelbooru.apiKey", text.trim())
+                    }
+                }
+            }
+
+            ContentSubsection {
                 title: Translation.tr("Booru download paths")
                 visible: (Config.options?.policies?.weeb ?? 0) !== 0
 

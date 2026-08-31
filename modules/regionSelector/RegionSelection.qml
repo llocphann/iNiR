@@ -399,6 +399,9 @@ PanelWindow {
 
         // Image post-processing
         snipProc.startDetached();
+        if (root.action === RegionSelection.SnipAction.Record
+                || root.action === RegionSelection.SnipAction.RecordWithSound)
+            RecorderStatus.scheduleQuickCheck();
         root.dismiss();
     }
 

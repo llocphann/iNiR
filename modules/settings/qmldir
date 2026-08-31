@@ -21,3 +21,4 @@ SettingsChromeEditFrame 1.0 SettingsChromeEditFrame.qml
 SettingsNativeDialogGuard 1.0 SettingsNativeDialogGuard.qml
 PillOptionsEditor 1.0 PillOptionsEditor.qml
 RicelinIslandEditor 1.0 RicelinIslandEditor.qml
+OrbitShelfEditor 1.0 OrbitShelfEditor.qml

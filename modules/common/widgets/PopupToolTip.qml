@@ -36,7 +36,9 @@ Item {
             return parent.hovered
         return true
     }
-    readonly property bool internalVisibleCondition: (extraVisibleCondition && parentHoverState) || alternativeVisibleCondition
+    readonly property bool hasContent: root.text.trim().length > 0
+    readonly property bool internalVisibleCondition: root.enabled && root.hasContent
+        && ((extraVisibleCondition && parentHoverState) || alternativeVisibleCondition)
     property var anchorEdges: Edges.Top
     property var anchorGravity: anchorEdges
 

@@ -6,6 +6,7 @@ import Quickshell
 import Quickshell.Io
 import qs.services
 import qs.modules.common
+import qs.modules.common.functions
 import qs.modules.common.widgets
 
 ContentPage {
@@ -42,7 +43,7 @@ ContentPage {
 
     readonly property string recordingAudioMode: RecorderStatus.configuredAudioMode
     readonly property string effectiveRecordingPath: {
-        const configured = Config.options?.screenRecord?.savePath ?? ""
+        const configured = String(Config.getNestedValue("screenRecord.savePath", ""))
         return configured.length > 0 ? configured : Directories.videosPath
     }
     readonly property string effectiveScreenshotPath: Directories.screenshotsPath

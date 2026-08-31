@@ -7,6 +7,7 @@ iNiR provides a flake with:
 | Output | Purpose |
 |---|---|
 | `packages.<system>.default` | Packaged iNiR runtime and `inir` launcher |
+| `packages.<system>.inir-mascot` | Optional mascot art pack companion package |
 | `nixosModules.inir` | NixOS module for system package + user service |
 | `homeModules.inir` | Home Manager module for user package + user service |
 
@@ -52,6 +53,10 @@ Add both flakes:
 }
 ```
 
+The default input tracks the stable branch. To test development builds before
+they reach `main`, point the iNiR input at `github:snowarch/inir/prerelease`
+instead and rebuild through Nix.
+
 Then import both modules in your NixOS configuration:
 
 ```nix
@@ -74,6 +79,11 @@ Then import both modules in your NixOS configuration:
 `programs.inir.service.compositor = "niri"` creates the user unit wiring under `niri.service.wants/inir.service`. It does not wire iNiR to `graphical-session.target`, so it will not auto-start under KDE, GNOME, or other desktop sessions.
 
 `extraPackages = [ config.programs.niri.package ];` puts the same `niri` client binary used by your compositor on iNiR's runtime `PATH`, so features that call `niri msg` use the matching package.
+
+Recorder runtime dependencies are provided by the iNiR package itself, including
+`wf-recorder`, `slurp`, `xdg-user-dirs`, `xdg-utils`, PipeWire/Pulse tooling, and
+FFmpeg when available in nixpkgs. They do not need to be duplicated in
+`programs.inir.extraPackages`.
 
 For useful default shortcuts, merge iNiR actions into `programs.niri.settings.binds`:
 
@@ -130,6 +140,31 @@ That symlink keeps tools that expect the traditional config path working, but it
 ```nix
 programs.inir.configSymlink.enable = true;
 ```
+
+## Optional mascot art pack
+
+The mascot artwork is distributed separately from the shell runtime. The flake
+exposes the current art pack as `packages.<system>.inir-mascot`. Combine it with
+the main package when you want the full mascot asset set:
+
+```nix
+{ inputs, pkgs, ... }:
+let
+  inirWithMascot = pkgs.symlinkJoin {
+    name = "inir-with-mascot";
+    paths = [
+      inputs.inir.packages.${pkgs.system}.default
+      inputs.inir.packages.${pkgs.system}.inir-mascot
+    ];
+  };
+in
+{
+  programs.inir.package = inirWithMascot;
+}
+```
+
+The companion package is pinned to a mascot release; updating the art pack does
+not mutate the immutable iNiR package in place.
 
 ## Hyprland
 

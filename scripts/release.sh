@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 usage() {
   cat <<'EOF'
 Usage:
@@ -9,7 +11,7 @@ Usage:
 
 Commands:
   notes    Extract the matching CHANGELOG section and append release footer links.
-  publish  Create the GitHub release for an existing local tag v<version>.
+  publish  Create the GitHub release for an existing local tag v<version> and sync the Wiki.
 
 EOF
 }
@@ -66,6 +68,7 @@ publish_release() {
   write_notes "$version" "$notes_file"
 
   gh release view "$tag" >/dev/null 2>&1 && die "GitHub release $tag already exists"
+  "$script_dir/wiki-sync.sh" publish "docs: sync wiki for $tag"
   gh release create "$tag" --title "$tag" --notes-file "$notes_file"
   rm -f "$notes_file"
 }

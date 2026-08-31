@@ -26,12 +26,18 @@ Singleton {
     }
 
     readonly property string previewDir: FileUtils.trimFileProtocol(Directories.genericCache) + "/inir/window-previews"
+    readonly property string sessionMarkerPath: previewDir + "/.niri-session"
+    readonly property string sessionKey: NiriService.socketPath ?? ""
     
     // Map of windowId -> { path, timestamp }
     property var previewCache: ({})
     
     property bool initialized: false
+    property bool sessionReady: false
+    property bool captureRequestedWhileInitializing: false
     property bool capturing: false
+    property bool captureAllRequested: false
+    property var requestedWindowIds: []
     
     // Preview validity duration (5 minutes)
     readonly property int previewValidityMs: 300000
@@ -59,11 +65,100 @@ Singleton {
         initialized = true
         ensureDirProcess.running = true
     }
+
+    function _resumeRequestedCapture(): void {
+        if (!captureRequestedWhileInitializing)
+            return
+        captureRequestedWhileInitializing = false
+        captureDebounceTimer.restart()
+    }
+
+    function _queueWindowIds(windowIds): void {
+        if (windowIds === null || windowIds === undefined) {
+            captureAllRequested = true
+            requestedWindowIds = []
+            return
+        }
+        if (captureAllRequested || !Array.isArray(windowIds))
+            return
+        const merged = new Set(requestedWindowIds)
+        for (const rawId of windowIds) {
+            const id = Number(rawId)
+            if (Number.isFinite(id) && id > 0)
+                merged.add(id)
+        }
+        requestedWindowIds = Array.from(merged)
+    }
+
+    function _hasPendingCaptureRequest(): bool {
+        return captureAllRequested || requestedWindowIds.length > 0
+    }
+
+    function _clearCaptureRequest(): void {
+        captureAllRequested = false
+        requestedWindowIds = []
+    }
+
+    function _pendingRequestNeedsCapture(): bool {
+        const now = Date.now()
+        const currentIds = captureAllRequested
+            ? (NiriService.windows ?? []).map(window => window.id)
+            : requestedWindowIds
+        for (const id of currentIds) {
+            const cached = previewCache[id]
+            if (!cached || (now - cached.timestamp) > previewValidityMs)
+                return true
+        }
+        return false
+    }
+
+    function _resetForCurrentSession(): void {
+        sessionResetProcess.running = true
+    }
     
     Process {
         id: ensureDirProcess
         command: ["/usr/bin/mkdir", "-p", root.previewDir]
-        onExited: scanProcess.running = true
+        onExited: sessionReadProcess.running = true
+    }
+
+    Process {
+        id: sessionReadProcess
+        command: ["/usr/bin/cat", root.sessionMarkerPath]
+        stdout: StdioCollector { id: sessionReadOutput }
+        onExited: exitCode => {
+            if (!root.initialized || root.sessionReady) return
+            const previousKey = exitCode === 0 ? sessionReadOutput.text.trim() : ""
+            if (root.sessionKey.length > 0 && previousKey === root.sessionKey)
+                scanProcess.running = true
+            else
+                root._resetForCurrentSession()
+        }
+    }
+
+    FileView {
+        id: sessionFileView
+        path: root.sessionMarkerPath
+        blockLoading: true
+        atomicWrites: true
+        printErrors: false
+    }
+
+    Process {
+        id: sessionResetProcess
+        command: [
+            "/usr/bin/find", root.previewDir,
+            "-maxdepth", "1", "-type", "f",
+            "-name", "window-*.png", "-delete"
+        ]
+        onExited: {
+            root.previewCache = ({})
+            root.sessionReady = true
+            if (root.sessionKey.length > 0)
+                sessionFileView.setText(root.sessionKey + "\n")
+            root.captureComplete()
+            root._resumeRequestedCapture()
+        }
     }
     
     Process {
@@ -85,6 +180,10 @@ Singleton {
         onExited: {
             _log("[WindowPreviewService] Loaded", Object.keys(root.previewCache).length, "cached previews")
             root.cleanupOrphans()
+            root.previewCache = Object.assign({}, root.previewCache)
+            root.sessionReady = true
+            root.captureComplete()
+            root._resumeRequestedCapture()
         }
     }
     
@@ -119,16 +218,24 @@ Singleton {
     property bool initialCapturesDone: false
     
     // Called when TaskView/dock preview opens - debounced to coalesce rapid hover events
-    function captureForTaskView(): void {
+    function captureForTaskView(windowIds = null): void {
+        root._queueWindowIds(windowIds)
         if (!initialized) initialize()
 
         // Always emit captureComplete immediately so cached previews show instantly
         root.captureComplete()
 
+        if (!sessionReady) {
+            captureRequestedWhileInitializing = true
+            return
+        }
+
         if (capturing) return
 
         // Cooldown: don't re-capture if we just finished one
-        if (Date.now() - _lastCaptureEndTime < _captureCooldownMs && initialCapturesDone) {
+        if (Date.now() - _lastCaptureEndTime < _captureCooldownMs
+                && initialCapturesDone && !root._pendingRequestNeedsCapture()) {
+            root._clearCaptureRequest()
             return
         }
 
@@ -139,7 +246,13 @@ Singleton {
     function _doCapture(): void {
         if (capturing) return
         
-        const windows = NiriService.windows ?? []
+        const allWindows = NiriService.windows ?? []
+        const requestedIds = new Set(root.requestedWindowIds)
+        const captureEverything = root.captureAllRequested
+        root._clearCaptureRequest()
+        const windows = captureEverything
+            ? allWindows
+            : allWindows.filter(window => requestedIds.has(window.id))
         if (windows.length === 0) return
         
         const now = Date.now()
@@ -235,6 +348,8 @@ Singleton {
             Cliphist.suppressRefresh = false
             Cliphist.refresh()
             root.captureComplete()
+            if (root._hasPendingCaptureRequest())
+                captureDebounceTimer.restart()
         }
     }
     

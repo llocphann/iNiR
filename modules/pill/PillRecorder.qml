@@ -33,6 +33,24 @@ PillSurface {
         }
     }
 
+    function audioModeGlyph(mode) {
+        switch (mode) {
+        case "microphone": return "mic"
+        case "both": return "mixer"
+        case "none": return "speaker-off"
+        default: return "speaker"
+        }
+    }
+
+    function cycleAudioMode() {
+        switch (root.audioMode) {
+        case "none": RecorderStatus.setConfiguredAudioMode("system"); break
+        case "system": RecorderStatus.setConfiguredAudioMode("microphone"); break
+        case "microphone": RecorderStatus.setConfiguredAudioMode("both"); break
+        default: RecorderStatus.setConfiguredAudioMode("none"); break
+        }
+    }
+
     readonly property string elapsed: {
         const t = Math.max(0, RecorderStatus.elapsedSeconds);
         const m = Math.floor(t / 60);
@@ -228,14 +246,14 @@ PillSurface {
                     anchors.centerIn: parent
                     width: 18 * root.s
                     height: 18 * root.s
-                    name: root.withSound ? "speaker" : "speaker-off"
+                    name: root.audioModeGlyph(root.audioMode)
                     color: root.withSound ? PillTheme.vermLit : PillTheme.iconDim
                     stroke: 1.7
                 }
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: RecorderStatus.setConfiguredAudioMode(root.withSound ? "none" : "system")
+                    onClicked: root.cycleAudioMode()
                 }
             }
 

@@ -11,12 +11,13 @@ Usage:
   scripts/wiki-sync.sh export <wiki-checkout>
   scripts/wiki-sync.sh check
   scripts/wiki-sync.sh clone [directory]
+  scripts/wiki-sync.sh publish [commit-message]
 
 export  Copy the current docs into an existing GitHub Wiki checkout.
 check   Compare the public Wiki with the current docs. Requires network access.
 clone   Clone the public Wiki for inspection. It does not publish anything.
-
-Publishing stays manual. Review the Wiki checkout, then commit and push it yourself.
+publish Export docs to a temporary Wiki checkout, commit changes and push them.
+        This is an explicit maintainer publication action.
 EOF
 }
 
@@ -55,6 +56,23 @@ case "$command" in
     clone)
         target=${2:-wiki}
         git clone "$wiki_url" "$target"
+        ;;
+    publish)
+        [[ $# -le 2 ]] || { usage; exit 2; }
+        tmp="$(mktemp -d)"
+        trap 'rm -rf "$tmp"' EXIT
+        git clone --quiet "$wiki_url" "$tmp/wiki"
+        copy_docs "$tmp/wiki"
+        if git -C "$tmp/wiki" diff --quiet -- .; then
+            printf 'Wiki already matches docs.\n'
+            exit 0
+        fi
+        git -C "$tmp/wiki" add -- '*.md'
+        git -C "$tmp/wiki" \
+            -c user.name="$(git -C "$repo_root" config user.name)" \
+            -c user.email="$(git -C "$repo_root" config user.email)" \
+            commit -m "${2:-docs: sync wiki from repository docs}"
+        git -C "$tmp/wiki" push origin HEAD:master
         ;;
     *)
         usage

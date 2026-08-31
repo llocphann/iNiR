@@ -403,6 +403,12 @@ Singleton {
             params.push("limit=" + limit)
             if (resolvedProviderId == "gelbooru") {
                 params.push("pid=" + page)
+                const apiKey = String(Config.options?.sidebar?.booru?.gelbooru?.apiKey ?? "").trim()
+                const userId = String(Config.options?.sidebar?.booru?.gelbooru?.userId ?? "").trim()
+                if (apiKey.length > 0 && userId.length > 0) {
+                    params.push("api_key=" + encodeURIComponent(apiKey))
+                    params.push("user_id=" + encodeURIComponent(userId))
+                }
             }
             else {
                 params.push("page=" + page)
@@ -423,8 +429,20 @@ Singleton {
     function makeRequest(tags, nsfw=false, limit=20, page=1, providerOverride) {
         const requestProviderId = providers[providerOverride] ? providerOverride : currentProvider
         const requestProvider = providers[requestProviderId]
+        if (requestProviderId === "gelbooru") {
+            const apiKey = String(Config.options?.sidebar?.booru?.gelbooru?.apiKey ?? "").trim()
+            const userId = String(Config.options?.sidebar?.booru?.gelbooru?.userId ?? "").trim()
+            if (apiKey.length === 0 || userId.length === 0) {
+                root.addSystemMessage(Translation.tr("Gelbooru requires an API key and user ID. Add both in Settings → Sidebars → Gelbooru."))
+                root.responseFinished()
+                return
+            }
+        }
         var url = root.constructRequestUrlForProvider(requestProviderId, tags, nsfw, limit, page)
-        _log("[Booru] Making request to " + url)
+        const logUrl = requestProviderId === "gelbooru"
+            ? url.replace(/([?&](?:api_key|user_id)=)[^&]*/g, "$1[redacted]")
+            : url
+        _log("[Booru] Making request to " + logUrl)
 
         const newResponse = root.booruResponseDataComponent.createObject(null, {
             "provider": requestProviderId,
@@ -503,6 +521,13 @@ Singleton {
             return
         }
         var url = provider.tagSearchTemplate.replace("{{query}}", encodeURIComponent(query))
+        if (currentProvider === "gelbooru") {
+            const apiKey = String(Config.options?.sidebar?.booru?.gelbooru?.apiKey ?? "").trim()
+            const userId = String(Config.options?.sidebar?.booru?.gelbooru?.userId ?? "").trim()
+            if (apiKey.length === 0 || userId.length === 0)
+                return
+            url += "&api_key=" + encodeURIComponent(apiKey) + "&user_id=" + encodeURIComponent(userId)
+        }
 
         var xhr = new XMLHttpRequest()
         currentTagRequest = xhr

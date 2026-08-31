@@ -35,11 +35,32 @@ DialogListItem {
                 text: strength > 80 ? "signal_wifi_4_bar" : strength > 60 ? "network_wifi_3_bar" : strength > 40 ? "network_wifi_2_bar" : strength > 20 ? "network_wifi_1_bar" : "signal_wifi_0_bar"
                 color: Appearance.inirEverywhere ? Appearance.inir.colTextSecondary : Appearance.colors.colOnSurfaceVariant
             }
-            StyledText {
+            ColumnLayout {
                 Layout.fillWidth: true
-                color: Appearance.inirEverywhere ? Appearance.inir.colText : Appearance.colors.colOnSurfaceVariant
-                elide: Text.ElideRight
-                text: root.wifiNetwork?.ssid ?? Translation.tr("Unknown")
+                spacing: 2
+                StyledText {
+                    Layout.fillWidth: true
+                    color: Appearance.inirEverywhere ? Appearance.inir.colText : Appearance.colors.colOnSurfaceVariant
+                    elide: Text.ElideRight
+                    text: root.wifiNetwork?.ssid ?? Translation.tr("Unknown")
+                }
+                Revealer {
+                    vertical: true
+                    reveal: root.wifiNetwork?.active ?? false
+                    Layout.fillWidth: true
+                    StyledText {
+                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        color: Appearance.inirEverywhere ? Appearance.inir.colTextSecondary : Appearance.colors.colSubtext
+                        elide: Text.ElideRight
+                        text: {
+                            if (!root.wifiNetwork?.active) return "";
+                            const details = Network.accessPointDetails(root.wifiNetwork, true).split(" | ").join(" • ");
+                            return details.length > 0
+                                ? `${Translation.tr("Connected")} • ${details}`
+                                : Translation.tr("Connected");
+                        }
+                    }
+                }
             }
             MaterialSymbol {
                 visible: (root.wifiNetwork?.isSecure || root.wifiNetwork?.active) ?? false

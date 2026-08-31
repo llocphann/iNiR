@@ -11,6 +11,7 @@ Commands:
   apply-output NAME    Apply temporary output changes via niri msg
   persist-output NAME  Write output config to KDL config.d/15-outputs.kdl
   get-input            Read current input config from KDL
+  get-hot-corners      Read effective Niri overview hot corners
   get-layout           Read current layout config from KDL
   get-animations       Read current animation config from KDL (with per-type springs)
   get-window-rules     Read window-rule globals from KDL
@@ -25,6 +26,7 @@ Commands:
 """
 
 from difflib import unified_diff
+import glob
 import json
 import os
 import re
@@ -741,6 +743,160 @@ def _has_top_level_flag(block_content, flag_name):
             return True
         depth += raw_line.count("{") - raw_line.count("}")
     return False
+
+
+def _strip_kdl_line_comments(content):
+    """Remove // comments while preserving quoted strings and line structure."""
+    cleaned = []
+    for line in content.splitlines(keepends=True):
+        in_string = False
+        escaped = False
+        cut = None
+        i = 0
+        while i < len(line):
+            ch = line[i]
+            if escaped:
+                escaped = False
+            elif ch == "\\" and in_string:
+                escaped = True
+            elif ch == '"':
+                in_string = not in_string
+            elif ch == "/" and not in_string and i + 1 < len(line) and line[i + 1] == "/":
+                cut = i
+                break
+            i += 1
+        if cut is None:
+            cleaned.append(line)
+        else:
+            cleaned.append(line[:cut] + ("\n" if line.endswith("\n") else ""))
+    return "".join(cleaned)
+
+
+def _flatten_niri_config(path, seen=None):
+    """Expand active include directives in-place for read-only config inspection."""
+    if seen is None:
+        seen = set()
+
+    try:
+        resolved = path.expanduser().resolve()
+    except Exception:
+        resolved = path.expanduser()
+    if resolved in seen or not resolved.exists():
+        return ""
+    seen.add(resolved)
+
+    try:
+        content = resolved.read_text()
+    except Exception:
+        return ""
+
+    chunks = []
+    include_re = re.compile(r'^\s*include\s+"([^"]+)"\s*$')
+    for line in content.splitlines(keepends=True):
+        stripped = _strip_kdl_line_comments(line).strip()
+        match = include_re.match(stripped)
+        if not match:
+            chunks.append(line)
+            continue
+
+        include_pattern = os.path.expandvars(os.path.expanduser(match.group(1)))
+        if not os.path.isabs(include_pattern):
+            include_pattern = str(resolved.parent / include_pattern)
+        for included in sorted(glob.glob(include_pattern)):
+            nested = _flatten_niri_config(Path(included), seen)
+            chunks.append(nested)
+            if nested and not nested.endswith("\n"):
+                chunks.append("\n")
+    return "".join(chunks)
+
+
+def _iter_output_blocks(content):
+    pattern = re.compile(r'(?:^|\n)\s*output\s+"([^"]+)"\s*\{')
+    for match in pattern.finditer(content):
+        if _brace_depth_before(content, match.start()) != 0:
+            continue
+        inner_start = match.end()
+        depth = 1
+        i = inner_start
+        while i < len(content) and depth > 0:
+            if content[i] == "{":
+                depth += 1
+            elif content[i] == "}":
+                depth -= 1
+            i += 1
+        if depth == 0:
+            yield match.group(1), content[inner_start:i - 1]
+
+
+def _parse_hot_corner_block(block):
+    if block is None:
+        return None
+
+    entries = []
+    for raw in block.splitlines():
+        token = raw.strip()
+        if token in {"off", "top-left", "top-right", "bottom-left", "bottom-right"}:
+            entries.append(token)
+    if "off" in entries:
+        return []
+
+    mapping = {
+        "top-left": "topLeft",
+        "top-right": "topRight",
+        "bottom-left": "bottomLeft",
+        "bottom-right": "bottomRight",
+    }
+    corners = [mapping[token] for token in entries if token in mapping]
+    return corners if corners else ["topLeft"]
+
+
+def cmd_get_hot_corners():
+    """Read effective Niri overview hot corners without mutating compositor config."""
+    flattened = _strip_kdl_line_comments(_flatten_niri_config(get_niri_config_path()))
+
+    gestures = _extract_block(flattened, "gestures", top_level=True)
+    global_block = _extract_block(gestures, "hot-corners", top_level=True) if gestures is not None else None
+    global_corners = _parse_hot_corner_block(global_block)
+    if global_corners is None:
+        global_corners = ["topLeft"]
+
+    configured_overrides = {}
+    for output_name, output_block in _iter_output_blocks(flattened):
+        override = _parse_hot_corner_block(
+            _extract_block(output_block, "hot-corners", top_level=True)
+        )
+        if override is not None:
+            configured_overrides[output_name] = override
+
+    effective = {}
+    raw_outputs, rc = run_niri("-j", "outputs")
+    if rc == 0:
+        try:
+            output_data = json.loads(raw_outputs)
+        except Exception:
+            output_data = {}
+        for connector, data in output_data.items():
+            aliases = {connector}
+            identity = " ".join(
+                str(data.get(key, "")).strip()
+                for key in ("make", "model", "serial")
+                if str(data.get(key, "")).strip()
+            ).strip()
+            if identity:
+                aliases.add(identity)
+
+            override = None
+            for alias in aliases:
+                if alias in configured_overrides:
+                    override = configured_overrides[alias]
+            effective[connector] = list(global_corners if override is None else override)
+
+    print(json.dumps({
+        "global": global_corners,
+        "overrides": configured_overrides,
+        "effective": effective,
+    }))
+    return 0
 
 
 # ─── Layout ───────────────────────────────────────────────────────────
@@ -2801,7 +2957,7 @@ def main():
         print(
             json.dumps(
                 {
-                    "error": "No command. Use: outputs, apply-output, persist-output, get-input, get-layout, get-animations, get-window-rules, list-cursor-themes, sync-cursor, validate, detect-customizations, set, get-binds, set-bind, remove-bind"
+                    "error": "No command. Use: outputs, apply-output, persist-output, get-input, get-hot-corners, get-layout, get-animations, get-window-rules, list-cursor-themes, sync-cursor, validate, detect-customizations, set, get-binds, set-bind, remove-bind"
                 }
             )
         )
@@ -2815,6 +2971,7 @@ def main():
         "apply-output": lambda: cmd_apply_output(args),
         "persist-output": lambda: cmd_persist_output(args),
         "get-input": lambda: cmd_get_input(),
+        "get-hot-corners": lambda: cmd_get_hot_corners(),
         "get-layout": lambda: cmd_get_layout(),
         "get-animations": lambda: cmd_get_animations(),
         "get-window-rules": lambda: cmd_get_window_rules(),

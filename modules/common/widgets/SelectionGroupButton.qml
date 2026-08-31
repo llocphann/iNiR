@@ -15,6 +15,7 @@ GroupButton {
     bounce: false
     property string buttonIcon
     property string buttonPreviewKind: ""
+    property real maxTextWidth: 180
     property bool leftmost: false
     property bool rightmost: false
     readonly property bool showZzzPreview: Appearance.zzzEverywhere && buttonPreviewKind.length > 0
@@ -144,7 +145,9 @@ GroupButton {
         }
 
         Item {
-            implicitWidth: root.buttonText?.length > 0 ? textItem.implicitWidth : 0
+            Layout.minimumWidth: 0
+            implicitWidth: root.buttonText?.length > 0
+                ? Math.min(textItem.implicitWidth, root.maxTextWidth) : 0
             implicitHeight: textMetrics.height // Force height to that of regular text
             opacity: root.buttonText?.length > 0 ? 1 : 0
             visible: opacity > 0
@@ -167,7 +170,11 @@ GroupButton {
 
             StyledText {
                 id: textItem
-                anchors.centerIn: parent
+                anchors.fill: parent
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                elide: Text.ElideRight
+                maximumLineCount: 1
                 color: Appearance.regaliaEverywhere
                     ? (root.toggled ? Appearance.regalia.primaryPlateInk : Appearance.regalia.onColor)
                     : Appearance.zzzEverywhere

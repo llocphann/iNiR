@@ -434,7 +434,7 @@
                 "pauseOnGameMode": true,
                 "pauseOnFullscreen": true,
                 "pauseWhenWindowsPresent": false,
-                "showPausedEffect": true
+                "showPausedEffect": false
             },
             "clock": {
                 "cookie": {
@@ -1380,6 +1380,78 @@
         "windowTileMargin": 6,
         "workspaceSpacing": 5
     },
+    "orbit": {
+        "backdropBlurMode": "shell",
+        "backdropBlurSaturation": 18,
+        "backdropBlurStrength": 72,
+        "backdropBlurTint": 28,
+        "balancedGrid": true,
+        "closeOnSelect": true,
+        "enable": true,
+        "hotCorner": "topRight",
+        "hotCornerDwellMs": 0,
+        "hotCornerEnable": true,
+        "hotCornerSize": 12,
+        "hotCornerActivationDistance": 2,
+        "maxPanelWidthPercent": 92,
+        "studio": {
+            "density": "compact",
+            "showDescriptions": true,
+            "surfaceStyle": "ricelin",
+            "widthPercent": 26
+        },
+        "presentation": {
+            "advanced": false,
+            "direction": "top",
+            "distance": 92,
+            "enterDurationMs": 300,
+            "entryDelayMs": 64,
+            "entryOpacityPercent": 0,
+            "entryStaggerMs": 42,
+            "entryStyle": "cascade",
+            "exitDurationMs": 220,
+            "preset": "adaptive",
+            "shelfDelayMs": 72
+        },
+        "navigationMotion": {
+            "advanced": false,
+            "durationMs": 320,
+            "easing": "smooth",
+            "preset": "fluid"
+        },
+        "scrimDim": 35,
+        "canvasScrubNavigation": true,
+        "canvasScrubThreshold": 96,
+        "scrollNavigation": true,
+        "scrollSteps": 1,
+        "scrollSwitchWorkspace": true,
+        "scrollWrapAround": false,
+        "showStash": true,
+        "showTrail": true,
+        "showWorkspaceNumbers": true,
+        "shelf": {
+            "closeOnAction": true,
+            "enable": true,
+            "modules": [
+                "locator",
+                "trail",
+                "niri",
+                "actions",
+                "stash"
+            ],
+            "pinnedActions": [
+                "open-clipboard",
+                "toggle-tiling",
+                "toggle-dashboard"
+            ]
+        },
+        "stashRestoreMode": "original",
+        "trailItems": 5,
+        "windowGap": 4,
+        "workspaceCount": 3,
+        "workspaceScalePercent": 27,
+        "workspaceSpacing": 18
+    },
     "performance": {
         "blurAreas": {
             "bar": "inherit",
@@ -1475,6 +1547,10 @@
         "booru": {
             "allowNsfw": false,
             "defaultProvider": "yandere",
+            "gelbooru": {
+                "apiKey": "",
+                "userId": ""
+            },
             "downloadPath": {
                 "sfw": "",
                 "nsfw": ""

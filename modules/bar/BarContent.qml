@@ -1531,6 +1531,27 @@ Item { // Bar content region
                     iconSize: Appearance.font.pixelSize.larger
                     color: rightSidebarButton.colText
                     Layout.rightMargin: BluetoothStatus.available ? indicatorsRowLayout.realSpacing : 0
+
+                    HoverHandler {
+                        id: wifiHover
+                        onHoveredChanged: {
+                            if (hovered) {
+                                Network.refreshActiveNetworkDetails();
+                            }
+                        }
+                    }
+
+                    StyledToolTip {
+                        extraVisibleCondition: wifiHover.hovered
+                        text: {
+                            if (!Network.wifiEnabled) return Translation.tr("Wi-Fi is disabled");
+                            if (Network.ethernet) return Translation.tr("Ethernet connected");
+                            if (!Network.networkName) return Translation.tr("Not connected");
+                            const connected = Translation.tr("Connected to %1").arg(Network.networkName);
+                            const details = Network.accessPointDetails(Network.active, true);
+                            return details.length > 0 ? `${connected} | ${details}` : connected;
+                        }
+                    }
                 }
                 Revealer {
                     reveal: BluetoothStatus.available
@@ -1539,6 +1560,15 @@ Item { // Bar content region
                         text: BluetoothStatus.activeIcon
                         iconSize: Appearance.font.pixelSize.larger
                         color: rightSidebarButton.colText
+
+                        HoverHandler {
+                            id: btHover
+                        }
+
+                        StyledToolTip {
+                            extraVisibleCondition: btHover.hovered
+                            text: BluetoothStatus.connectionTooltip()
+                        }
                     }
                 }
             }

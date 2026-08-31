@@ -51,8 +51,16 @@ Singleton {
     property bool oskOpen: false
     property bool overlayOpen: false
     property bool overviewOpen: false
+    property string overviewMode: "default"
     property string overviewTargetOutput: ""
     property string overviewSearchPrefix: ""
+    property bool orbitPocketRequested: false
+    property bool orbitStudioRequested: false
+    property bool orbitLensRequested: false
+    property string orbitLensRequestedQuery: ""
+    property string orbitStageOverride: ""
+    property var orbitRuntimeStatus: ({ open: false })
+    signal orbitNavigateRequested(int direction)
     signal pillSurfaceCommand(string command, string surface)
     property bool altSwitcherOpen: false
     signal altSwitcherCommand(string command)
@@ -323,21 +331,85 @@ Singleton {
             Config.options?.sidebar?.screenList ?? [])
 
     function openOverview(outputName): void {
+        overviewMode = "default"
         overviewTargetOutput = root.resolveOutputName(outputName, [])
         overviewOpen = true
     }
 
     function closeOverview(): void {
         overviewOpen = false
+        orbitPocketRequested = false
+        orbitStudioRequested = false
+        orbitLensRequested = false
+        orbitLensRequestedQuery = ""
+        orbitStageOverride = ""
+        orbitRuntimeStatus = ({ open: false })
     }
 
     function toggleOverview(outputName): void {
         const resolved = root.resolveOutputName(outputName, [])
-        if (overviewOpen && overviewPresentationOutput === resolved)
+        if (overviewOpen && overviewMode === "default" && overviewPresentationOutput === resolved)
             root.closeOverview()
         else
             root.openOverview(resolved)
     }
+
+    function openOrbit(outputName): void {
+        if (!CompositorService.isNiri || !(Config.options?.orbit?.enable ?? true))
+            return
+        overviewMode = "orbit"
+        overviewSearchPrefix = ""
+        overviewTargetOutput = root.resolveOutputName(outputName, [])
+        overviewOpen = true
+    }
+
+    function openOrbitView(outputName, view: string): void {
+        if (!CompositorService.isNiri || !(Config.options?.orbit?.enable ?? true))
+            return
+        orbitStageOverride = view === "orbital" ? "orbital" : "stage"
+        root.openOrbit(outputName)
+    }
+
+    function openOrbitPocket(outputName): void {
+        if (!CompositorService.isNiri)
+            return
+        orbitPocketRequested = true
+        root.openOrbit(outputName)
+    }
+
+    function openOrbitStudio(outputName): void {
+        if (!CompositorService.isNiri)
+            return
+        orbitStudioRequested = true
+        root.openOrbit(outputName)
+    }
+
+    function openOrbitLens(outputName, query: string): void {
+        if (!CompositorService.isNiri)
+            return
+        orbitLensRequestedQuery = query
+        orbitLensRequested = true
+        root.openOrbit(outputName)
+    }
+
+    function toggleOrbit(outputName): void {
+        const resolved = root.resolveOutputName(outputName, [])
+        if (overviewOpen && overviewMode === "orbit" && overviewPresentationOutput === resolved)
+            root.closeOverview()
+        else
+            root.openOrbit(resolved)
+    }
+
+    function toggleOrbitStageView(): void {
+        if (!overviewOpen || overviewMode !== "orbit")
+            return
+        const configured = Config.options?.orbit?.stageMode === "orbital" ? "orbital" : "stage"
+        const current = orbitStageOverride.length > 0 ? orbitStageOverride : configured
+        orbitStageOverride = current === "orbital" ? "stage" : "orbital"
+    }
+
+    function openTaskView(outputName): void { root.openOrbit(outputName) }
+    function toggleTaskView(outputName): void { root.toggleOrbit(outputName) }
 
     function openSidebarLeft(outputName): void {
         sidebarLeftTargetOutput = root.resolveOutputName(outputName,

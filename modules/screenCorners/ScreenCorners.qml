@@ -34,12 +34,29 @@ Scope {
         readonly property bool cornerOpenMatchesPosition: cornerOpenAtBottom === cornerWidget.isBottom
         readonly property bool shouldShowCornerOpen: cornerOpenEnabled
             && cornerOpenMatchesPosition && !fullscreen
+        readonly property string orbitCorner: Config.options?.orbit?.hotCorner ?? "topRight"
+        readonly property string cornerName: cornerWidget.isTopLeft ? "topLeft"
+            : cornerWidget.isTopRight ? "topRight"
+            : cornerWidget.isBottomLeft ? "bottomLeft" : "bottomRight"
+        readonly property string outputName: cornerPanelWindow.screen?.name ?? ""
+        readonly property bool orbitConflictsWithNiriOverview: CompositorService.isNiri
+            && NiriService.isOverviewHotCornerActive(outputName, cornerName)
+        readonly property bool shouldShowOrbitHotCorner: CompositorService.isNiri
+            && (Config.options?.panelFamily ?? "ii") !== "waffle"
+            && (Config.options?.orbit?.enable ?? true)
+            && (Config.options?.orbit?.hotCornerEnable ?? true)
+            && cornerName === orbitCorner
+            && !orbitConflictsWithNiriOverview
+            && !fullscreen
+        readonly property bool shouldShowSidebarCornerOpen: shouldShowCornerOpen
+            && !shouldShowOrbitHotCorner
 
-        visible: !fullscreen && (showFakeRounding || shouldShowCornerOpen)
+        visible: !fullscreen && (showFakeRounding || shouldShowSidebarCornerOpen || shouldShowOrbitHotCorner)
 
         exclusionMode: ExclusionMode.Ignore
         mask: Region {
-            item: sidebarCornerOpenInteractionLoader.active ? sidebarCornerOpenInteractionLoader : null
+            item: orbitHotCornerLoader.active ? orbitHotCornerLoader
+                : (sidebarCornerOpenInteractionLoader.active ? sidebarCornerOpenInteractionLoader : null)
         }
         WlrLayershell.namespace: "quickshell:screenCorners"
         WlrLayershell.layer: WlrLayer.Overlay
@@ -76,14 +93,85 @@ Scope {
             // Size for corner open interaction area
             readonly property int cornerOpenWidth: Config.options?.sidebar?.cornerOpen?.cornerRegionWidth ?? 20
             readonly property int cornerOpenHeight: Config.options?.sidebar?.cornerOpen?.cornerRegionHeight ?? 20
+            readonly property int orbitHotCornerSize: Math.max(4, Math.min(40,
+                Config.options?.orbit?.hotCornerSize ?? 12))
+            readonly property int orbitHotCornerActivationDistance: Math.max(1, Math.min(32,
+                Config.options?.orbit?.hotCornerActivationDistance ?? 2))
+            readonly property int orbitHotCornerHitSize: Math.max(
+                orbitHotCornerSize, orbitHotCornerActivationDistance)
 
             implicitSize: roundingSize
-            implicitWidth: Math.max(roundingSize, cornerPanelWindow.shouldShowCornerOpen ? cornerOpenWidth : 0)
-            implicitHeight: Math.max(roundingSize, cornerPanelWindow.shouldShowCornerOpen ? cornerOpenHeight : 0)
+            implicitWidth: Math.max(roundingSize,
+                cornerPanelWindow.shouldShowSidebarCornerOpen ? cornerOpenWidth : 0,
+                cornerPanelWindow.shouldShowOrbitHotCorner ? orbitHotCornerHitSize : 0)
+            implicitHeight: Math.max(roundingSize,
+                cornerPanelWindow.shouldShowSidebarCornerOpen ? cornerOpenHeight : 0,
+                cornerPanelWindow.shouldShowOrbitHotCorner ? orbitHotCornerHitSize : 0)
+
+            Loader {
+                id: orbitHotCornerLoader
+                active: cornerPanelWindow.shouldShowOrbitHotCorner
+                anchors {
+                    top: cornerWidget.isTop ? parent.top : undefined
+                    bottom: cornerWidget.isBottom ? parent.bottom : undefined
+                    left: cornerWidget.isLeft ? parent.left : undefined
+                    right: cornerWidget.isRight ? parent.right : undefined
+                }
+
+                sourceComponent: MouseArea {
+                    id: orbitHotCornerArea
+                    implicitWidth: cornerWidget.orbitHotCornerHitSize
+                    implicitHeight: cornerWidget.orbitHotCornerHitSize
+                    hoverEnabled: true
+                    property bool armed: true
+                    property bool atCorner: false
+
+                    function triggerOrbit(): void {
+                        if (!armed || !atCorner)
+                            return
+                        armed = false
+                        orbitDwellTimer.stop()
+                        GlobalStates.openOrbit(cornerPanelWindow.screen?.name ?? "")
+                    }
+
+                    onPositionChanged: mouse => {
+                        const distance = cornerWidget.orbitHotCornerActivationDistance
+                        const atX = cornerWidget.isRight
+                            ? mouse.x >= width - distance : mouse.x <= distance
+                        const atY = cornerWidget.isTop
+                            ? mouse.y <= distance : mouse.y >= height - distance
+                        atCorner = atX && atY
+                        if (!atCorner) {
+                            armed = true
+                            orbitDwellTimer.stop()
+                            return
+                        }
+                        if (!armed)
+                            return
+                        const dwell = Config.options?.orbit?.hotCornerDwellMs ?? 0
+                        if (dwell <= 0)
+                            triggerOrbit()
+                        else if (!orbitDwellTimer.running)
+                            orbitDwellTimer.restart()
+                    }
+                    onExited: {
+                        atCorner = false
+                        orbitDwellTimer.stop()
+                        if (!GlobalStates.overviewOpen || GlobalStates.overviewMode !== "orbit")
+                            armed = true
+                    }
+
+                    Timer {
+                        id: orbitDwellTimer
+                        interval: Math.max(1, Config.options?.orbit?.hotCornerDwellMs ?? 0)
+                        onTriggered: orbitHotCornerArea.triggerOrbit()
+                    }
+                }
+            }
 
             Loader {
                 id: sidebarCornerOpenInteractionLoader
-                active: cornerPanelWindow.shouldShowCornerOpen
+                active: cornerPanelWindow.shouldShowSidebarCornerOpen
                 anchors {
                     top: (cornerWidget.isTopLeft || cornerWidget.isTopRight) ? parent.top : undefined
                     bottom: (cornerWidget.isBottomLeft || cornerWidget.isBottomRight) ? parent.bottom : undefined

@@ -15,6 +15,7 @@ Item {
     property bool animateChange: false  // Compatibility with StyledText
     property bool forceNerd: false  // Force Nerd Font rendering (text is already a glyph)
     property bool animateFill: false
+    property int textRenderType: Text.NativeRendering
     
     // Use Nerd Font only when explicitly requested.
     readonly property bool useNerd: forceNerd
@@ -52,7 +53,7 @@ Item {
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
 
-        renderType: Text.NativeRendering
+        renderType: root.textRenderType
         font {
             hintingPreference: (root.useNerd && root.hasNerdGlyph) ? Font.PreferFullHinting : Font.PreferNoHinting
             family: root.useJp ? "Zen Kaku Gothic New"

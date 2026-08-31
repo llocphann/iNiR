@@ -26,6 +26,7 @@ Loader {
     property bool closeOnOutsideClick: false
     property var anchorRect: null
     property var popupAdjustment: null
+    property bool scaleContent: Appearance.motion.popupReveal.enableScale
     signal focusCleared()
 
     property real visualMargin: 8
@@ -257,7 +258,7 @@ Loader {
             }
             opacity: Appearance.motion.popupReveal.enableFade ? (shown ? 1 : 0) : 1
             scale: shown ? 1
-                : (Appearance.motion.popupReveal.enableScale
+                : (root.scaleContent
                     ? Appearance.motion.popupReveal.closedScale
                     : 1)
             transformOrigin: popupWindow.isHorizontalPopup
@@ -283,7 +284,7 @@ Loader {
             }
 
             Behavior on scale {
-                enabled: Appearance.animationsEnabled
+                enabled: Appearance.animationsEnabled && root.scaleContent
                 animation: NumberAnimation {
                     duration: popupWindow.closing
                         ? Appearance.animation.elementMoveExit.duration

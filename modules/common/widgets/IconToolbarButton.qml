@@ -8,6 +8,7 @@ import qs.modules.common.functions
 ToolbarButton {
     id: iconBtn
     implicitWidth: height
+    property int iconRenderType: Text.NativeRendering
 
     colBackgroundToggled: Appearance.regaliaEverywhere ? Appearance.regalia.primaryPlate
         : Appearance.zzzEverywhere ? Appearance.zzz.sticker
@@ -40,6 +41,7 @@ ToolbarButton {
         verticalAlignment: Text.AlignVCenter
         iconSize: Appearance.regaliaEverywhere ? 18 : 22
         text: iconBtn.text
+        textRenderType: iconBtn.iconRenderType
         color: iconBtn.colText
     }
 }

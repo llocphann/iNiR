@@ -428,9 +428,58 @@ ShellRoot {
 
     IpcHandler {
         target: "taskview"
-        function toggle(): void { GlobalStates.waffleTaskViewOpen = !GlobalStates.waffleTaskViewOpen }
-        function close(): void { GlobalStates.waffleTaskViewOpen = false }
-        function open(): void { GlobalStates.waffleTaskViewOpen = true }
+        function _isWaffle(): bool { return (Config.options?.panelFamily ?? "ii") === "waffle" }
+        function toggle(): void {
+            if (_isWaffle()) { GlobalStates.waffleTaskViewOpen = !GlobalStates.waffleTaskViewOpen; return }
+            if (CompositorService.isNiri) GlobalStates.toggleOrbit("")
+        }
+        function close(): void {
+            if (_isWaffle()) { GlobalStates.waffleTaskViewOpen = false; return }
+            if (GlobalStates.overviewMode === "orbit") GlobalStates.closeOverview()
+        }
+        function open(): void {
+            if (_isWaffle()) { GlobalStates.waffleTaskViewOpen = true; return }
+            if (CompositorService.isNiri) GlobalStates.openOrbit("")
+        }
+    }
+
+    IpcHandler {
+        target: "orbit"
+        function toggle(): void { if (CompositorService.isNiri) GlobalStates.toggleOrbit("") }
+        function close(): void { if (GlobalStates.overviewMode === "orbit") GlobalStates.closeOverview() }
+        function open(): void { if (CompositorService.isNiri) GlobalStates.openOrbit("") }
+        function pocket(): void { if (CompositorService.isNiri) GlobalStates.openOrbitPocket("") }
+        function studio(): void { if (CompositorService.isNiri) GlobalStates.openOrbitStudio("") }
+        function find(query: string): void { if (CompositorService.isNiri) GlobalStates.openOrbitLens("", query) }
+        function stage(): void { if (CompositorService.isNiri) GlobalStates.openOrbitView("", "stage") }
+        function orbital(): void { if (CompositorService.isNiri) GlobalStates.openOrbitView("", "orbital") }
+        function next(): void { if (CompositorService.isNiri) GlobalStates.orbitNavigateRequested(1) }
+        function previous(): void { if (CompositorService.isNiri) GlobalStates.orbitNavigateRequested(-1) }
+        function status(): string {
+            const outputName = NiriService.currentOutput ?? ""
+            const orbitCorner = Config.options?.orbit?.hotCorner ?? "topRight"
+            return JSON.stringify(Object.assign({}, GlobalStates.orbitRuntimeStatus, {
+                studioRequested: GlobalStates.orbitStudioRequested,
+                pocketRequested: GlobalStates.orbitPocketRequested,
+                lensRequested: GlobalStates.orbitLensRequested,
+                hotCorner: {
+                    orbit: orbitCorner,
+                    activationDistance: Config.options?.orbit?.hotCornerActivationDistance ?? 2,
+                    output: outputName,
+                    niri: NiriService.overviewHotCornersForOutput(outputName),
+                    conflict: NiriService.isOverviewHotCornerActive(outputName, orbitCorner),
+                    detectionReady: NiriService.overviewHotCornersReady,
+                    detectionError: NiriService.overviewHotCornersError
+                }
+            }))
+        }
+        function toggleView(): void {
+            if (!CompositorService.isNiri) return
+            if (GlobalStates.overviewOpen && GlobalStates.overviewMode === "orbit")
+                GlobalStates.toggleOrbitStageView()
+            else
+                GlobalStates.openOrbit("")
+        }
     }
 
     // IPC for settings - overlay mode or separate window based on config

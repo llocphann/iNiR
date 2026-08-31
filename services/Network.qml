@@ -81,8 +81,39 @@ Singleton {
         if (active) disconnectProc.exec(["nmcli", "connection", "down", active.ssid]);
     }
 
+    function refreshActiveNetworkDetails(): void {
+        if (!getNetworks.running) {
+            getNetworks.running = true;
+        }
+    }
+
     function openPublicWifiPortal() {
         ShellExec.execDetachedArgs(["xdg-open", "https://nmcheck.gnome.org/"], "Open network check") // From some StackExchange thread, seems to work
+    }
+
+    function accessPointDetails(accessPoint, includeBssid = false): string {
+        if (!accessPoint) return "";
+        const details = [];
+        if (accessPoint.strength >= 0)
+            details.push(`${accessPoint.strength}%`);
+        if (accessPoint.bandLabel.length > 0) {
+            details.push(accessPoint.frequency > 0
+                ? `${accessPoint.bandLabel} (${accessPoint.frequency} MHz)`
+                : accessPoint.bandLabel);
+        }
+        if (accessPoint.rate.length > 0)
+            details.push(accessPoint.rate);
+        if (includeBssid && accessPoint.bssid.length > 0)
+            details.push(accessPoint.bssid);
+        return details.join(" | ");
+    }
+
+    function connectionTooltip(includeBssid = false): string {
+        if (!root.wifiEnabled) return Translation.tr("Wi-Fi is disabled");
+        if (root.ethernet) return Translation.tr("Ethernet connected");
+        if (!root.networkName) return Translation.tr("Not connected");
+        const details = root.accessPointDetails(root.active, includeBssid);
+        return details.length > 0 ? `${root.networkName} | ${details}` : root.networkName;
     }
 
     function changePassword(network: WifiAccessPoint, password: string, username = ""): void {
@@ -311,7 +342,7 @@ Singleton {
     Process {
         id: getNetworks
         running: false
-        command: ["nmcli", "-g", "ACTIVE,SIGNAL,FREQ,SSID,BSSID,SECURITY", "d", "w"]
+        command: ["nmcli", "-g", "ACTIVE,SIGNAL,FREQ,SSID,BSSID,SECURITY,RATE", "d", "w"]
         environment: ({
             LANG: "C",
             LC_ALL: "C"
@@ -330,7 +361,8 @@ Singleton {
                         frequency: parseInt(net[2]),
                         ssid: net[3],
                         bssid: net[4]?.replace(rep2, ":") ?? "",
-                        security: net[5] || ""
+                        security: net[5] || "",
+                        rate: net[6] || ""
                     };
                 }).filter(n => n.ssid && n.ssid.length > 0);
 

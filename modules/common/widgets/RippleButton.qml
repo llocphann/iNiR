@@ -29,6 +29,8 @@ Button {
         : Appearance.zzzEverywhere ? Appearance.zzz.overshootDuration : 1200
     // Regalia uses material compression + metal edge feedback, not a Material ripple.
     property bool rippleEnabled: !Appearance.regaliaEverywhere
+    property bool stateTransitionsEnabled: true
+    property bool pressScaleEnabled: true
     // Expensive organic morph is explicit. Generic buttons remain familiar
     // pills; compact semantic controls can opt in and keep one persistent face.
     property bool cookieMorphing: false
@@ -83,12 +85,12 @@ Button {
     property color rippleColor: root.toggled ? colRippleToggled : colRipple
 
     Behavior on opacity {
-        enabled: Appearance.animationsEnabled
+        enabled: Appearance.animationsEnabled && root.stateTransitionsEnabled
         animation: NumberAnimation { duration: Appearance.animation.elementMoveFast.duration; easing.type: Appearance.animation.elementMoveFast.type; easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve }
     }
 
     Behavior on buttonEffectiveRadius {
-        enabled: Appearance.animationsEnabled
+        enabled: Appearance.animationsEnabled && root.stateTransitionsEnabled
         animation: NumberAnimation { duration: Appearance.animation.elementResize.duration; easing.type: Appearance.animation.elementResize.type; easing.bezierCurve: Appearance.animation.elementResize.bezierCurve }
     }
 
@@ -214,11 +216,11 @@ Button {
             ? (root.buttonHovered ? Appearance.angel.colBorderHover : "transparent")
             : "transparent"
         Behavior on border.color {
-            enabled: Appearance.animationsEnabled
+            enabled: Appearance.animationsEnabled && root.stateTransitionsEnabled
             animation: ColorAnimation { duration: Appearance.animation.stateChange.duration; easing.type: Appearance.animation.stateChange.type; easing.bezierCurve: Appearance.animation.stateChange.bezierCurve }
         }
         Behavior on color {
-            enabled: Appearance.animationsEnabled
+            enabled: Appearance.animationsEnabled && root.stateTransitionsEnabled
             animation: ColorAnimation { duration: Appearance.animation.stateChange.duration; easing.type: Appearance.animation.stateChange.type; easing.bezierCurve: Appearance.animation.stateChange.bezierCurve }
         }
         readonly property real _pressScale: {
@@ -230,9 +232,9 @@ Button {
             return Math.max(0.94, Math.min(0.995,
                 1 - inset / Math.max(w, h)));
         }
-        scale: root.down && root.enabled && !Appearance.regaliaEverywhere ? _pressScale : 1
+        scale: root.down && root.enabled && root.pressScaleEnabled && !Appearance.regaliaEverywhere ? _pressScale : 1
         Behavior on scale {
-            enabled: Appearance.animationsEnabled
+            enabled: Appearance.animationsEnabled && root.stateTransitionsEnabled
             NumberAnimation {
                 duration: Appearance.animation.elementMoveFast.duration
                 easing.type: Appearance.animation.elementMoveFast.type

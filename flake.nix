@@ -20,10 +20,12 @@
       packages = forAllSystems (pkgs:
         let
           package = pkgs.callPackage ./nix/package.nix { inherit pkgs; };
+          mascotPackage = pkgs.callPackage ./nix/mascot-package.nix { inherit pkgs; };
         in
         {
           default = package;
           inir = package;
+          inir-mascot = mascotPackage;
         });
 
       nixosModules.default = nixosModule;

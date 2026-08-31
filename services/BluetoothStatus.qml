@@ -28,6 +28,23 @@ Singleton {
         return root._materialIconForDevice(root.firstActiveDevice);
     }
 
+    function activeDeviceSummary(includeAdditionalCount = false): string {
+        const device = root.firstActiveDevice;
+        if (!device) return "";
+        let summary = device.name || Translation.tr("Unknown device");
+        if (device.batteryAvailable)
+            summary += ` (${Math.round(device.battery * 100)}%)`;
+        if (includeAdditionalCount && root.activeDeviceCount > 1)
+            summary += ` +${root.activeDeviceCount - 1}`;
+        return summary;
+    }
+
+    function connectionTooltip(): string {
+        if (!root.enabled) return Translation.tr("Bluetooth is disabled");
+        if (!root.connected) return Translation.tr("Bluetooth disconnected");
+        return root.activeDeviceSummary() || Translation.tr("Bluetooth connected");
+    }
+
     function _materialIconForDevice(device: BluetoothDevice): string {
         const xdg = (device?.icon ?? "").toLowerCase();
         if (xdg.length === 0) return "bluetooth_connected";

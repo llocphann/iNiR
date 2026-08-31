@@ -10,8 +10,7 @@ QuickToggleModel {
     name: Translation.tr("Bluetooth")
     statusText: BluetoothStatus.firstActiveDevice?.name ?? Translation.tr("Not connected")
     tooltipText: Translation.tr("%1 | Right-click to configure").arg(
-        (BluetoothStatus.firstActiveDevice?.name ?? Translation.tr("Bluetooth"))
-        + (BluetoothStatus.activeDeviceCount > 1 ? ` +${BluetoothStatus.activeDeviceCount - 1}` : "")
+        BluetoothStatus.activeDeviceSummary(true) || Translation.tr("Bluetooth")
     )
     icon: BluetoothStatus.activeIcon
 

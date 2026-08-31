@@ -1369,8 +1369,16 @@ AbstractWidget {
                 const axes = root.resizableAxes;
                 let vals = {};
                 if (axes.uniform) vals.uniform = Number(root._readConfigKey(axes.uniform) ?? 100);
-                if (axes.width) vals.width = Number(root._readConfigKey(axes.width) ?? Math.round(root.width / root.scaleFactor));
-                if (axes.height) vals.height = Number(root._readConfigKey(axes.height) ?? Math.round(root.height / root.scaleFactor));
+                if (axes.width) {
+                    const storedWidth = Number(root._readConfigKey(axes.width));
+                    vals.width = Number.isFinite(storedWidth) && storedWidth > 0
+                        ? storedWidth : Math.round(root.width / root.scaleFactor);
+                }
+                if (axes.height) {
+                    const storedHeight = Number(root._readConfigKey(axes.height));
+                    vals.height = Number.isFinite(storedHeight) && storedHeight > 0
+                        ? storedHeight : Math.round(root.height / root.scaleFactor);
+                }
                 rh._startConfigVals = vals
                 root._resizePreviewValues = ({})
                 root._isResizing = true

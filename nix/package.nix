@@ -34,6 +34,7 @@ let
       rsync
       systemd
       wget
+      xdg-user-dirs
       xdg-utils
 
       quickshell
