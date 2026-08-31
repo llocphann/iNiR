@@ -284,6 +284,14 @@ Item {
         Qt.callLater(root._requestPage)
     }
 
+    Connections {
+        target: Config
+        function onReadyChanged(): void {
+            if (Config.ready)
+                SettingsArrangement.migrateLegacyPageIndices()
+        }
+    }
+
     Repeater {
         id: pageRepeater
         model: root.pages.length
