@@ -1112,8 +1112,27 @@ tlp_settings_managed_records() {
     done < "$tlp_settings_config_file"
 }
 
+# TLP 1.11 renamed profile suffixes from AC/BAT to PRF/BAL at runtime while
+# continuing to accept legacy config keys. Keep the schema/UI on the stable
+# legacy names for 1.10 compatibility, but read back the canonical variable so
+# post-Apply verification observes what TLP actually loaded.
+tlp_settings_runtime_key() {
+    local key=${1:-} version=${2:-}
+    local minor runtime_key
+
+    runtime_key=$key
+    minor=$(tlp_settings_version_minor "$version" 2>/dev/null || true)
+    if [ -n "$minor" ] && [ "$minor" -ge 11 ]; then
+        case "$key" in
+            *_ON_AC) runtime_key="${key%_ON_AC}_ON_PRF" ;;
+            *_ON_BAT) runtime_key="${key%_ON_BAT}_ON_BAL" ;;
+        esac
+    fi
+    printf '%s' "$runtime_key"
+}
+
 run_tlp_settings_probe() (
-    local key is_set value
+    local key runtime_key is_set value
 
     set +e
     set +u
@@ -1125,6 +1144,8 @@ run_tlp_settings_probe() (
 
     for key in $(jq -r '.categories[].settings[].key' "$tlp_settings_schema"); do
         unset "$key"
+        runtime_key=$(tlp_settings_runtime_key "$key" "${TLPVER:-}")
+        [ "$runtime_key" = "$key" ] || unset "$runtime_key"
     done
     unset TLP_ENABLE
 
@@ -1145,9 +1166,17 @@ run_tlp_settings_probe() (
     printf 'meta\tversion\t%s\n' "${TLPVER:-}"
     printf 'meta\tenabled\t%s\n' "${TLP_ENABLE:-}"
     for key in $(jq -r '.categories[].settings[].key' "$tlp_settings_schema"); do
-        eval "is_set=\${$key+x}"
+        runtime_key=$(tlp_settings_runtime_key "$key" "${TLPVER:-}")
+        eval "is_set=\${$runtime_key+x}"
+        if [ "$is_set" != x ] && [ "$runtime_key" != "$key" ]; then
+            # Not every *_ON_BAT setting is a profile-suffix setting (for
+            # example RESTORE_THRESHOLDS_ON_BAT). Fall back to the legacy name
+            # when TLP deliberately kept it unchanged.
+            runtime_key=$key
+            eval "is_set=\${$runtime_key+x}"
+        fi
         [ "$is_set" = x ] || continue
-        eval "value=\${$key-}"
+        eval "value=\${$runtime_key-}"
         value=$(printf '%s' "$value" | tr '\t\r\n' '   ')
         printf 'setting\t%s\t%s\n' "$key" "$value"
     done

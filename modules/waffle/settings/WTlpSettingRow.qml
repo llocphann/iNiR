@@ -35,6 +35,7 @@ ColumnLayout {
         ? root.currentValue.trim().split(/\s+/)
         : []
     readonly property var optionValues: TlpSettingsService.optionValues(root.definition)
+    readonly property var editorNumberRange: root.computeNumberRange()
     readonly property string displayLabel: {
         const base = Translation.tr(TlpSettingsService.settingLabel(root.definition))
         const profileName = TlpSettingsService.profileLabel(root.profile)
@@ -48,21 +49,159 @@ ColumnLayout {
     Layout.fillWidth: true
     spacing: 0
 
+    function gpuFrequencyMatch(key): var {
+        return String(key ?? "").match(/^INTEL_GPU_(MIN|MAX|BOOST)_FREQ_ON_(AC|BAT|SAV)$/)
+    }
+
+    function gpuFrequencyGroupKeys(): var {
+        const match = root.gpuFrequencyMatch(root.settingKey)
+        if (!match)
+            return []
+        const driver = String(TlpRuntimeCapabilities.intelGpuDriver ?? "")
+        const suffix = match[2]
+        if (driver === "xe") {
+            if (match[1] === "BOOST")
+                return []
+            return [
+                "INTEL_GPU_MIN_FREQ_ON_" + suffix,
+                "INTEL_GPU_MAX_FREQ_ON_" + suffix
+            ]
+        }
+        if (driver === "i915" || driver === "mixed") {
+            return [
+                "INTEL_GPU_MIN_FREQ_ON_" + suffix,
+                "INTEL_GPU_MAX_FREQ_ON_" + suffix,
+                "INTEL_GPU_BOOST_FREQ_ON_" + suffix
+            ]
+        }
+        return []
+    }
+
+    function runtimeRangeFor(key): var {
+        void TlpRuntimeCapabilities.numberRanges
+        const ranges = TlpRuntimeCapabilities.numberRanges
+        if (!Object.prototype.hasOwnProperty.call(ranges, key))
+            return null
+        const range = ranges[key]
+        const minimum = Number(range?.min)
+        const maximum = Number(range?.max)
+        if (!Number.isFinite(minimum) || !Number.isFinite(maximum) || minimum > maximum)
+            return null
+        return ({ min: minimum, max: maximum })
+    }
+
+    function runtimeDefaultFor(key): string {
+        void TlpRuntimeCapabilities.numberDefaults
+        const defaults = TlpRuntimeCapabilities.numberDefaults
+        if (!Object.prototype.hasOwnProperty.call(defaults, key))
+            return ""
+        const value = Number(defaults[key])
+        return Number.isFinite(value) ? String(Math.round(value)) : ""
+    }
+
+    function safePeerNumber(key) {
+        void TlpSettingsService.pendingValues
+        void TlpSettingsService.managedValues
+        void TlpSettingsService.effectiveValues
+        const value = Number.parseInt(TlpSettingsService.value(key), 10)
+        if (!Number.isFinite(value))
+            return Number.NaN
+        const range = root.runtimeRangeFor(key)
+        if (range !== null && (value < range.min || value > range.max))
+            return Number.NaN
+        return value
+    }
+
+    function computeNumberRange(): var {
+        const runtimeRange = root.runtimeRangeFor(root.settingKey)
+        const schemaMin = Number(root.definition?.min ?? 0)
+        const schemaMax = Number(root.definition?.max ?? 100)
+        const baseMin = runtimeRange !== null ? runtimeRange.min : schemaMin
+        const baseMax = runtimeRange !== null ? runtimeRange.max : schemaMax
+        let minimum = baseMin
+        let maximum = baseMax
+
+        const match = root.gpuFrequencyMatch(root.settingKey)
+        if (match) {
+            const kind = match[1]
+            const suffix = match[2]
+            const minKey = "INTEL_GPU_MIN_FREQ_ON_" + suffix
+            const maxKey = "INTEL_GPU_MAX_FREQ_ON_" + suffix
+            const boostKey = "INTEL_GPU_BOOST_FREQ_ON_" + suffix
+            const minValue = root.safePeerNumber(minKey)
+            const maxValue = root.safePeerNumber(maxKey)
+            const boostValue = root.safePeerNumber(boostKey)
+            const hasBoost = String(TlpRuntimeCapabilities.intelGpuDriver ?? "") !== "xe"
+
+            if (kind === "MIN") {
+                if (Number.isFinite(maxValue))
+                    maximum = Math.min(maximum, maxValue)
+                if (hasBoost && Number.isFinite(boostValue))
+                    maximum = Math.min(maximum, boostValue)
+            } else if (kind === "MAX") {
+                if (Number.isFinite(minValue))
+                    minimum = Math.max(minimum, minValue)
+                if (hasBoost && Number.isFinite(boostValue))
+                    maximum = Math.min(maximum, boostValue)
+            } else if (kind === "BOOST") {
+                if (Number.isFinite(maxValue))
+                    minimum = Math.max(minimum, maxValue)
+            }
+        }
+
+        if (minimum > maximum) {
+            minimum = baseMin
+            maximum = baseMax
+        }
+        return ({ min: minimum, max: maximum })
+    }
+
+    function safeGpuPeerValue(key): string {
+        const current = root.safePeerNumber(key)
+        if (Number.isFinite(current))
+            return String(current)
+        return root.runtimeDefaultFor(key)
+    }
+
     function defaultValue(): string {
         if (root.currentValue.length > 0)
             return root.currentValue
         if (root.inheritedValue.length > 0)
             return root.inheritedValue
+        const runtimeDefault = root.runtimeDefaultFor(root.settingKey)
+        if (runtimeDefault.length > 0)
+            return runtimeDefault
         const example = TlpSettingsService.exampleValue(root.definition)
         if (example.length > 0)
             return example
         if (root.settingType === "number")
-            return String(root.definition?.min ?? 0)
+            return String(root.editorNumberRange.min)
         return root.optionValues.length > 0 ? String(root.optionValues[0]) : ""
     }
 
     function setValue(value): void {
-        TlpSettingsService.stageSet(root.settingKey, String(value ?? ""))
+        const normalized = String(value ?? "")
+        const groupKeys = root.gpuFrequencyGroupKeys()
+        if (groupKeys.length > 0) {
+            for (const key of groupKeys) {
+                const nextValue = key === root.settingKey
+                    ? normalized : root.safeGpuPeerValue(key)
+                if (nextValue.length > 0)
+                    TlpSettingsService.stageSet(key, nextValue)
+            }
+            return
+        }
+        TlpSettingsService.stageSet(root.settingKey, normalized)
+    }
+
+    function unsetValue(): void {
+        const groupKeys = root.gpuFrequencyGroupKeys()
+        if (groupKeys.length > 0) {
+            for (const key of groupKeys)
+                TlpSettingsService.stageUnset(key)
+            return
+        }
+        TlpSettingsService.stageUnset(root.settingKey)
     }
 
     function toggleToken(token: string): void {
@@ -72,6 +211,10 @@ ColumnLayout {
             next.splice(index, 1)
         else
             next.push(token)
+        if (next.length === 0 && root.settingKey.startsWith("PLATFORM_PROFILE_")) {
+            root.unsetValue()
+            return
+        }
         root.setValue(next.join(" "))
     }
 
@@ -99,7 +242,7 @@ ColumnLayout {
             if (checked)
                 root.setValue(root.defaultValue())
             else
-                TlpSettingsService.stageUnset(root.settingKey)
+                root.unsetValue()
         }
     }
 
@@ -151,10 +294,10 @@ ColumnLayout {
             property bool _ready: false
             label: Translation.tr("Value")
             description: Translation.tr("Allowed: %1–%2").arg(
-                root.definition?.min ?? 0).arg(root.definition?.max ?? 100)
+                root.editorNumberRange.min).arg(root.editorNumberRange.max)
             suffix: String(root.definition?.unit ?? "")
-            from: Number(root.definition?.min ?? 0)
-            to: Number(root.definition?.max ?? 100)
+            from: root.editorNumberRange.min
+            to: root.editorNumberRange.max
             stepSize: Number(root.definition?.step ?? 1)
             value: {
                 const parsed = Number.parseInt(root.currentValue, 10)
