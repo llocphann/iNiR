@@ -1112,18 +1112,28 @@ tlp_settings_managed_records() {
     done < "$tlp_settings_config_file"
 }
 
-# TLP 1.11 renamed profile suffixes from AC/BAT to PRF/BAL at runtime while
-# continuing to accept legacy config keys. Keep the schema/UI on the stable
-# legacy names for 1.10 compatibility, but read back the canonical variable so
-# post-Apply verification observes what TLP actually loaded.
+# TLP 1.11 renamed profile markers from AC/BAT to PRF/BAL at runtime while
+# continuing to accept legacy config keys. The marker can occur at the end or
+# before a qualifier such as _NOT_IN_USE. Keep schema/UI keys stable for 1.10,
+# but read back TLP's canonical variable for post-Apply verification.
 tlp_settings_runtime_key() {
     local key=${1:-} version=${2:-}
-    local minor runtime_key
+    local minor runtime_key prefix suffix
 
     runtime_key=$key
     minor=$(tlp_settings_version_minor "$version" 2>/dev/null || true)
     if [ -n "$minor" ] && [ "$minor" -ge 11 ]; then
         case "$key" in
+            *_ON_AC_*)
+                prefix=${key%%_ON_AC_*}
+                suffix=${key#*_ON_AC}
+                runtime_key="${prefix}_ON_PRF${suffix}"
+                ;;
+            *_ON_BAT_*)
+                prefix=${key%%_ON_BAT_*}
+                suffix=${key#*_ON_BAT}
+                runtime_key="${prefix}_ON_BAL${suffix}"
+                ;;
             *_ON_AC) runtime_key="${key%_ON_AC}_ON_PRF" ;;
             *_ON_BAT) runtime_key="${key%_ON_BAT}_ON_BAL" ;;
         esac
@@ -1169,9 +1179,9 @@ run_tlp_settings_probe() (
         runtime_key=$(tlp_settings_runtime_key "$key" "${TLPVER:-}")
         eval "is_set=\${$runtime_key+x}"
         if [ "$is_set" != x ] && [ "$runtime_key" != "$key" ]; then
-            # Not every *_ON_BAT setting is a profile-suffix setting (for
-            # example RESTORE_THRESHOLDS_ON_BAT). Fall back to the legacy name
-            # when TLP deliberately kept it unchanged.
+            # Not every legacy-looking profile marker was renamed by TLP. Fall
+            # back to the schema key so settings intentionally kept unchanged
+            # remain observable and removable.
             runtime_key=$key
             eval "is_set=\${$runtime_key+x}"
         fi

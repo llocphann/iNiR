@@ -12,6 +12,7 @@ Singleton {
     property var numberRanges: ({})
     property var numberDefaults: ({})
     property string cpuScalingDriver: ""
+    property string intelPstateStatus: ""
     property string amdPstateStatus: ""
     property string kernelRelease: ""
     property string intelGpuDriver: ""
@@ -90,16 +91,20 @@ Singleton {
 
     function _refreshCpuDriverModes(): void {
         const driver = String(root.cpuScalingDriver ?? "").trim()
+        const intelStatus = String(root.intelPstateStatus ?? "").trim()
+        const amdStatus = String(root.amdPstateStatus ?? "").trim()
         let modes = []
-        if (driver === "intel_pstate") {
+
+        // intel_pstate reports scaling_driver=intel_cpufreq in passive mode,
+        // so the status ABI is the authoritative capability signal there.
+        if (driver === "intel_pstate" || intelStatus === "active" || intelStatus === "passive") {
             modes = ["active", "passive"]
         } else if (driver === "amd-pstate" || driver === "amd-pstate-epp"
-                || String(root.amdPstateStatus ?? "").trim().length > 0) {
+                || amdStatus === "active" || amdStatus === "passive" || amdStatus === "guided") {
             modes = ["active", "passive"]
-            // guided mode was added to amd-pstate in the kernel 6.4 era.
-            // Keep the UI conservative instead of offering a value the kernel
-            // can reject at Apply time.
-            if (root._kernelAtLeast(6, 4))
+            // guided mode was added to amd-pstate in the kernel 6.4 era. Also
+            // retain it on backported kernels already running in guided mode.
+            if (amdStatus === "guided" || root._kernelAtLeast(6, 4))
                 modes.push("guided")
         }
         root._setValues(root.cpuDriverModeKeys, modes)
@@ -170,6 +175,7 @@ Singleton {
         governorFile.reload()
         memSleepFile.reload()
         scalingDriverFile.reload()
+        intelPstateStatusFile.reload()
         amdPstateStatusFile.reload()
         kernelReleaseFile.reload()
         if (!gpuProbe.running)
@@ -218,6 +224,19 @@ Singleton {
         }
         onLoadFailed: {
             root.cpuScalingDriver = ""
+            root._refreshCpuDriverModes()
+        }
+    }
+
+    FileView {
+        id: intelPstateStatusFile
+        path: "/sys/devices/system/cpu/intel_pstate/status"
+        onLoaded: {
+            root.intelPstateStatus = intelPstateStatusFile.text().trim()
+            root._refreshCpuDriverModes()
+        }
+        onLoadFailed: {
+            root.intelPstateStatus = ""
             root._refreshCpuDriverModes()
         }
     }

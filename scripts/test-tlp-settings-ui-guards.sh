@@ -43,12 +43,20 @@ assert_eq CPU_BOOST_ON_PRF \
 assert_eq CPU_BOOST_ON_BAL \
     "$(tlp_settings_runtime_key CPU_BOOST_ON_BAT 1.11.0)" \
     'TLP 1.11 must read the canonical BAL profile key'
+assert_eq DEVICES_TO_DISABLE_ON_PRF_NOT_IN_USE \
+    "$(tlp_settings_runtime_key DEVICES_TO_DISABLE_ON_AC_NOT_IN_USE 1.11.0)" \
+    'TLP 1.11 must rename embedded AC profile markers before trailing qualifiers'
+assert_eq DEVICES_TO_DISABLE_ON_BAL_NOT_IN_USE \
+    "$(tlp_settings_runtime_key DEVICES_TO_DISABLE_ON_BAT_NOT_IN_USE 1.11.0)" \
+    'TLP 1.11 must rename embedded BAT profile markers before trailing qualifiers'
 assert_eq TLP_PROFILE_AC \
     "$(tlp_settings_runtime_key TLP_PROFILE_AC 1.11.0)" \
     'profile selection keys are not suffix-renamed settings'
 
 assert_contains 'CPU_DRIVER_OPMODE_ON_AC' "$runtime" \
     'runtime capabilities must gate CPU driver modes'
+assert_contains '/sys/devices/system/cpu/intel_pstate/status' "$runtime" \
+    'intel_pstate passive mode must remain detectable'
 assert_contains '_kernelAtLeast(6, 4)' "$runtime" \
     'guided amd-pstate mode must be kernel-gated'
 assert_contains 'INTEL_GPU_MIN_FREQ_ON_AC' "$runtime" \
