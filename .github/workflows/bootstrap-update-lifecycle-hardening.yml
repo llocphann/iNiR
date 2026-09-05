@@ -1,0 +1,63 @@
+name: Bootstrap update lifecycle hardening
+
+on:
+  push:
+    branches:
+      - fix/update-lifecycle-hardening-20260905
+    paths:
+      - tools/apply-update-lifecycle-hardening.py
+      - .github/workflows/bootstrap-update-lifecycle-hardening.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install static test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fish jq rsync
+
+      - name: Apply hardening patch
+        run: python3 tools/apply-update-lifecycle-hardening.py
+
+      - name: Validate shell syntax and policy files
+        run: |
+          bash -n setup
+          bash -n sdata/lib/functions.sh
+          bash -n sdata/lib/robust-update.sh
+          bash -n sdata/lib/snapshots.sh
+          bash -n scripts/test-update-lifecycle.sh
+          bash -n scripts/test-local-distribution.sh
+          python3 -m json.tool sdata/runtime-exclusions.json >/dev/null
+          python3 -m py_compile sdata/lib/runtime-payload.py tools/apply-update-lifecycle-hardening.py
+
+      - name: Run lifecycle regression tests
+        run: |
+          bash scripts/test-update-lifecycle.sh
+          bash scripts/test-tlp-settings-ui-guards.sh
+          bash scripts/test-tlp-integration-lifecycle.sh
+
+      - name: Run QML startup guards
+        run: fish scripts/qml-check.fish --all
+
+      - name: Run aggregate static suite
+        run: bash scripts/test-local-distribution.sh
+
+      - name: Commit generated fix
+        run: |
+          if git diff --quiet; then
+            echo 'No generated changes'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add setup sdata/lib/functions.sh sdata/lib/robust-update.sh sdata/lib/snapshots.sh scripts/test-local-distribution.sh
+          git commit -m 'fix(update): harden verification and lifecycle'
+          git push
