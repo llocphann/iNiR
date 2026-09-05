@@ -8,6 +8,11 @@ helper="$repo_root/assets/helpers/inir-battery-charge-limit"
 runtime="$repo_root/services/TlpRuntimeCapabilities.qml"
 classic="$repo_root/modules/settings/TlpSettingRow.qml"
 waffle="$repo_root/modules/waffle/settings/WTlpSettingRow.qml"
+general="$repo_root/modules/settings/GeneralConfig.qml"
+power="$repo_root/modules/settings/TlpPowerSettings.qml"
+registry="$repo_root/modules/settings/SettingsPageRegistry.qml"
+arrangement="$repo_root/modules/settings/SettingsArrangement.qml"
+legacy_tlp="$repo_root/modules/settings/TlpConfig.qml"
 
 fail() {
     printf 'not ok - %s\n' "$1" >&2
@@ -73,5 +78,47 @@ for row in "$classic" "$waffle"; do
         "$(basename "$row") must turn an empty TLP 1.11 profile list into inherit/unset"
 done
 
+# Classic Settings integration: TLP is a System → Power task, not a separate
+# navigation page. Static search must target the real embedded card titles so
+# spotlight navigation can both switch tabs and scroll to the requested card.
+assert_contains 'GeneralConfigCore {' "$general" \
+    'System settings must retain the upstream GeneralConfig core'
+assert_contains 'TlpPowerSettings {' "$general" \
+    'System settings must embed the TLP power controls'
+assert_contains 'visible: root.activeSection === "power"' "$general" \
+    'embedded TLP controls must only be visible in the Power task'
+assert_contains 'root.selectTlpCategory("battery-care")' "$general" \
+    'charge-care deep links must select the battery-care TLP category'
+assert_contains 'SettingsPageRegistry.consumeLegacyTlpPowerRedirect()' "$general" \
+    'legacy page-28 state must land on the Power task instead of Audio'
+assert_contains 'property string settingsTaskSection: "power"' "$power" \
+    'TLP controls must identify themselves as part of the Power task'
+assert_contains 'title: Translation.tr("Battery and TLP power management")' "$power" \
+    'the primary TLP card title must remain a stable search target'
+assert_contains 'title: Translation.tr("Hardware-aware charge care")' "$power" \
+    'battery charge care must remain a stable search target'
+assert_contains 'readonly property int retiredTlpPageIndex: 28' "$registry" \
+    'the historical TLP page index must stay retired from public navigation'
+assert_contains 'Persistent.states.settings.iiPage = root.systemPageIndex' "$registry" \
+    'persisted legacy page 28 must migrate to System before navigation initializes'
+assert_contains 'function consumeLegacyTlpPowerRedirect(): bool' "$registry" \
+    'legacy current-page migration must expose a one-shot Power landing hint'
+assert_contains 'redirected.pageIndex = root.systemPageIndex' "$registry" \
+    'legacy TLP search entries must redirect to System'
+assert_contains 'Translation.tr("Power") + " · " + Translation.tr("Battery Care")' "$registry" \
+    'charge-care search must activate Power and identify its TLP category'
+assert_contains 'Translation.tr("Battery and TLP power management")' "$registry" \
+    'TLP search must target the actual embedded power-management card'
+assert_contains 'Translation.tr("Hardware-aware charge care")' "$registry" \
+    'charge-care search must target the actual embedded charge-care card'
+assert_contains 'keywords.concat(["system", "settings", "power"])' "$registry" \
+    'redirected TLP search must stay discoverable through System settings terms'
+assert_contains 'hidden.push(root.retiredTlpPageIndex)' "$arrangement" \
+    'retired page 28 must stay internal-only in saved arrangements'
+assert_contains 'GeneralConfig {' "$legacy_tlp" \
+    'legacy TlpConfig links must redirect through System settings'
+assert_contains 'activeSection: "power"' "$legacy_tlp" \
+    'legacy TlpConfig links must land on the Power task'
+
 printf '%s\n' '1..1'
-printf '%s\n' 'ok 1 - TLP UI capability guards and TLP 1.11 key compatibility are present'
+printf '%s\n' 'ok 1 - TLP UI guards and System Power integration are present'

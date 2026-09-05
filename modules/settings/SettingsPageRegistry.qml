@@ -1,5 +1,6 @@
 pragma Singleton
 import QtQuick
+import qs.services
 import qs.modules.common
 
 /**
@@ -16,6 +17,7 @@ Singleton {
 
     readonly property int retiredTlpPageIndex: 28
     readonly property int systemPageIndex: 1
+    property bool _legacyTlpPowerRedirectPending: false
 
     readonly property var pages: SettingsPageRegistryData.pages.filter(
         (page, index) => index !== root.retiredTlpPageIndex)
@@ -36,6 +38,23 @@ Singleton {
     // Compatibility shape for code that introspects the sanitized arrangement.
     readonly property var _arrangement: ({ groups: root.categories, hidden: root.hiddenPages })
 
+    function _migrateLegacyPersistentPage(): void {
+        if (!Persistent.ready || !Persistent.states?.settings)
+            return
+        if (Number(Persistent.states.settings.iiPage ?? -1) !== root.retiredTlpPageIndex)
+            return
+
+        Persistent.states.settings.iiPage = root.systemPageIndex
+        root._legacyTlpPowerRedirectPending = true
+    }
+
+    function consumeLegacyTlpPowerRedirect(): bool {
+        if (!root._legacyTlpPowerRedirectPending)
+            return false
+        root._legacyTlpPowerRedirectPending = false
+        return true
+    }
+
     function iconForPage(idx) {
         return (idx >= 0 && idx < root.pages.length)
             ? (root.pages[idx].icon || "settings") : "settings"
@@ -47,9 +66,33 @@ Singleton {
                 return entry
 
             const redirected = Object.assign({}, entry)
+            const keywords = Array.isArray(entry.keywords) ? entry.keywords : []
+            const chargeCareEntry = keywords.includes("threshold")
+                || keywords.includes("conservation")
+
             redirected.pageIndex = root.systemPageIndex
             redirected.pageName = root.pages[root.systemPageIndex].name
+            // Search navigation uses section to activate task tabs and label to
+            // resolve the actual SettingsCardSection. Charge Care also needs
+            // its TLP category selected before the card becomes visible.
+            redirected.section = chargeCareEntry
+                ? Translation.tr("Power") + " · " + Translation.tr("Battery Care")
+                : Translation.tr("Power")
+            redirected.label = chargeCareEntry
+                ? Translation.tr("Hardware-aware charge care")
+                : Translation.tr("Battery and TLP power management")
+            redirected.keywords = keywords.concat(["system", "settings", "power"])
             return redirected
         })
+    }
+
+    Component.onCompleted: root._migrateLegacyPersistentPage()
+
+    Connections {
+        target: Persistent
+        function onReadyChanged(): void {
+            if (Persistent.ready)
+                root._migrateLegacyPersistentPage()
+        }
     }
 }
