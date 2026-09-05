@@ -8,9 +8,9 @@ import qs.modules.common
  *
  * The historical registry is kept byte-for-byte in SettingsPageRegistryData.
  * Battery/TLP used to be its final page (28). TLP now belongs to System →
- * Power, so this facade removes that retired page from every navigation model
- * and redirects its static search entries to System without shifting any of
- * the existing 0…27 page indices.
+ * Power. Page 28 remains only as an internal compatibility alias so a legacy
+ * persisted/current-page value can never clamp to Orbit before migration runs;
+ * sidebar/category/search navigation still exposes only the canonical pages.
  */
 Singleton {
     id: root
@@ -19,8 +19,20 @@ Singleton {
     readonly property int systemPageIndex: 1
     property bool _legacyTlpPowerRedirectPending: false
 
-    readonly property var pages: SettingsPageRegistryData.pages.filter(
-        (page, index) => index !== root.retiredTlpPageIndex)
+    readonly property var pages: SettingsPageRegistryData.pages.map((page, index) => {
+        if (index !== root.retiredTlpPageIndex)
+            return page
+        const systemPage = SettingsPageRegistryData.pages[root.systemPageIndex]
+        // Preserve the historical `tlp` key/component for old direct links,
+        // while presenting it as System if a legacy host opens index 28 before
+        // Persistent migration gets a chance to rewrite the stored index.
+        return Object.assign({}, page, {
+            name: systemPage.name,
+            icon: systemPage.icon,
+            desc: systemPage.desc,
+            essential: systemPage.essential
+        })
+    })
 
     readonly property var defaultCategories: SettingsPageRegistryData.defaultCategories.map(category => ({
         label: category.label,

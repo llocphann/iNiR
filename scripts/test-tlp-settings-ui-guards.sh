@@ -99,8 +99,14 @@ assert_contains 'title: Translation.tr("Hardware-aware charge care")' "$power" \
     'battery charge care must remain a stable search target'
 assert_contains 'readonly property int retiredTlpPageIndex: 28' "$registry" \
     'the historical TLP page index must stay retired from public navigation'
+assert_contains 'SettingsPageRegistryData.pages.map((page, index)' "$registry" \
+    'legacy page 28 must remain an internal compatibility alias until migration wins the startup race'
+assert_contains 'name: systemPage.name' "$registry" \
+    'the internal page-28 fallback must present itself as System, not as a standalone Battery page'
+assert_contains 'pages: category.pages.filter(index => index !== root.retiredTlpPageIndex)' "$registry" \
+    'the internal page-28 fallback must never reappear in sidebar categories'
 assert_contains 'Persistent.states.settings.iiPage = root.systemPageIndex' "$registry" \
-    'persisted legacy page 28 must migrate to System before navigation initializes'
+    'persisted legacy page 28 must migrate to System when Persistent becomes available'
 assert_contains 'function consumeLegacyTlpPowerRedirect(): bool' "$registry" \
     'legacy current-page migration must expose a one-shot Power landing hint'
 assert_contains 'redirected.pageIndex = root.systemPageIndex' "$registry" \
