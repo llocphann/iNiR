@@ -97,6 +97,8 @@ assert_contains 'title: Translation.tr("Battery and TLP power management")' "$po
     'the primary TLP card title must remain a stable search target'
 assert_contains 'title: Translation.tr("Hardware-aware charge care")' "$power" \
     'battery charge care must remain a stable search target'
+assert_contains 'import Quickshell' "$registry" \
+    'SettingsPageRegistry must import the Quickshell Singleton type or shell startup will fail'
 assert_contains 'readonly property int retiredTlpPageIndex: 28' "$registry" \
     'the historical TLP page index must stay retired from public navigation'
 assert_contains 'SettingsPageRegistryData.pages.map((page, index)' "$registry" \
