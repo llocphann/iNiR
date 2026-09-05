@@ -7,6 +7,8 @@ ThemePresetCard 1.0 ThemePresetCard.qml
 ColorPickerRow 1.0 ColorPickerRow.qml
 BatteryChargeLimitSettings 1.0 BatteryChargeLimitSettings.qml
 TlpSettingRow 1.0 TlpSettingRow.qml
+GeneralConfigCore 1.0 GeneralConfigCore.qml
+TlpPowerSettings 1.0 TlpPowerSettings.qml
 WaffleConfig 1.0 WaffleConfig.qml
 AutostartConfig 1.0 AutostartConfig.qml
 WorkspaceStripConfig 1.0 WorkspaceStripConfig.qml

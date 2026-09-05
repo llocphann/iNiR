@@ -7,7 +7,8 @@ import qs.modules.common
 QtObject {
     id: root
 
-    readonly property int layoutSchemaVersion: 3
+    readonly property int layoutSchemaVersion: 4
+    readonly property int legacyTlpPageIndex: 28
 
     function snapshot(): var {
         return ({
@@ -27,10 +28,28 @@ QtObject {
         }))
     }
 
+    function _defaultWithoutStandaloneTlp(): var {
+        return ({
+            groups: SettingsPageRegistry.defaultCategories.map(group => ({
+                label: group.label,
+                pages: group.pages.filter(index => index !== root.legacyTlpPageIndex)
+            })),
+            // Keep page 28 as a hidden compatibility target for old links and
+            // static search entries. Canonical navigation is System → Power.
+            hidden: [root.legacyTlpPageIndex]
+        })
+    }
+
     function migrateLegacyPageIndices(): void {
         const raw = Config.options?.settingsUi?.categories ?? ""
-        if (typeof raw !== "string" || raw.length === 0)
+
+        // A fresh/default layout used to expose Battery/TLP as page 28. Write a
+        // v4 arrangement once so that page becomes an internal compatibility
+        // target and disappears from normal navigation.
+        if (typeof raw !== "string" || raw.length === 0) {
+            root.save(root._defaultWithoutStandaloneTlp())
             return
+        }
 
         let saved
         try {
@@ -39,8 +58,8 @@ QtObject {
             return
         }
 
-        if (!Array.isArray(saved)
-                && Number(saved?.version ?? 0) >= root.layoutSchemaVersion)
+        const sourceVersion = Array.isArray(saved) ? 1 : Number(saved?.version ?? 2)
+        if (!Array.isArray(saved) && sourceVersion >= root.layoutSchemaVersion)
             return
 
         const groups = Array.isArray(saved)
@@ -55,7 +74,7 @@ QtObject {
         const inspectIndex = index => {
             if (index === 27)
                 hasLegacyTlpIndex = true
-            else if (index === 28)
+            else if (index === root.legacyTlpPageIndex)
                 hasCurrentTlpIndex = true
         }
 
@@ -66,24 +85,27 @@ QtObject {
         }
         hidden.forEach(inspectIndex)
 
-        const shouldRemapTlp = hasLegacyTlpIndex && !hasCurrentTlpIndex
+        // v1/v2 layouts from before Orbit used 27 for TLP. Preserve the old
+        // disambiguation rule: when 28 is absent, that 27 is the retired TLP
+        // page, not Orbit. Removing it lets Registry surface the newly added
+        // Orbit page as missing, while TLP itself now lives under System.
+        const dropPreOrbitTlp = sourceVersion < 3
+            && hasLegacyTlpIndex && !hasCurrentTlpIndex
+        const keepPage = index => index !== root.legacyTlpPageIndex
+            && !(dropPreOrbitTlp && index === 27)
+
         const migratedGroups = groups.map(group => {
             if (!group || typeof group.label !== "string")
                 return group
             return ({
                 label: group.label,
-                pages: (Array.isArray(group.pages) ? group.pages : [])
-                    .map(index => shouldRemapTlp && index === 27 ? 28 : index)
+                pages: (Array.isArray(group.pages) ? group.pages : []).filter(keepPage)
             })
         })
-        const migratedHidden = hidden
-            .map(index => shouldRemapTlp && index === 27 ? 28 : index)
+        const migratedHidden = hidden.filter(keepPage)
+        if (!migratedHidden.includes(root.legacyTlpPageIndex))
+            migratedHidden.push(root.legacyTlpPageIndex)
 
-        // Pre-Orbit fork layouts used index 27 for Battery/TLP. Orbit now owns
-        // 27 and Battery/TLP moved to 28, so preserve the user's old placement
-        // or hidden state. A newly added Orbit page is intentionally left
-        // missing; SettingsPageRegistry will surface it in the trailing More
-        // group, matching the existing behavior for newly introduced pages.
         root.save({ groups: migratedGroups, hidden: migratedHidden })
     }
 
@@ -109,6 +131,8 @@ QtObject {
 
     function movePage(sourceCategory: int, sourceIndex: int, pageIdx: int,
                       targetCategory: int, targetIndex: int): bool {
+        if (pageIdx === root.legacyTlpPageIndex)
+            return false
         if (!SettingsPageRegistry.categories[targetCategory])
             return false
 
@@ -164,6 +188,11 @@ QtObject {
     }
 
     function restorePage(pageIdx: int): bool {
+        // Page 28 is intentionally retired from navigation; its component is
+        // kept only so old deep links/search metadata cannot break.
+        if (pageIdx === root.legacyTlpPageIndex)
+            return false
+
         const state = root.snapshot()
         const hiddenIndex = state.hidden.indexOf(pageIdx)
         if (hiddenIndex < 0)
@@ -220,6 +249,8 @@ QtObject {
     }
 
     function reset(): void {
-        Config.setNestedValue("settingsUi.categories", "")
+        // Reset to the canonical v4 layout immediately instead of briefly
+        // exposing the retired standalone TLP page before migration reruns.
+        root.save(root._defaultWithoutStandaloneTlp())
     }
 }
