@@ -50,7 +50,9 @@ end
 set -l parser_skip_reason ""
 if test -n "$parser"
     set -l version_text ($parser --version 2>&1)
-    set -l parser_version (string match -r -o '[0-9]+\.[0-9]+(\.[0-9]+)?' -- $version_text | head -1)
+    # Fish 3.7 does not support `string match -o`; plain regex mode prints the
+    # matched substring and is portable across supported Fish versions.
+    set -l parser_version (string match -r '[0-9]+\.[0-9]+(\.[0-9]+)?' -- $version_text | head -1)
     if test -z "$parser_version"
         set parser_skip_reason "qmlformat version could not be determined"
         set parser ""
