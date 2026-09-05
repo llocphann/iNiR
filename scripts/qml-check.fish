@@ -82,10 +82,10 @@ for file in $qml_files
         end
     end
 
-    # Quickshell's Singleton type is not a QtQuick type. This explicit guard
-    # catches the startup regression that previously reached main.
+    # Quickshell's Singleton type is not a QtQuick type. Accept both modern
+    # semicolon-free imports and the older `import Quickshell;` spelling.
     if grep -qE '^[[:space:]]*Singleton[[:space:]]*\{' $file 2>/dev/null
-        if not grep -qE '^[[:space:]]*import[[:space:]]+Quickshell([[:space:]]|$)' $file 2>/dev/null
+        if not grep -qE '^[[:space:]]*import[[:space:]]+Quickshell([[:space:];]|$)' $file 2>/dev/null
             echo "ERROR: $basename: Singleton requires 'import Quickshell'" >&2
             set fatal_errors (math $fatal_errors + 1)
         end
