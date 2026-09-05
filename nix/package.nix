@@ -128,7 +128,7 @@ pkgs.stdenvNoCC.mkDerivation {
   version = lib.removeSuffix "\n" (builtins.readFile ../VERSION);
   src = lib.cleanSource ../.;
 
-  nativeBuildInputs = [ pkgs.makeWrapper ];
+  nativeBuildInputs = [ pkgs.makeWrapper pkgs.python3 pkgs.rsync ];
 
   # Prevent patchShebangs from attempting to rewrite Python scripts;
   # non-executable files are skipped during fixupPhase.
@@ -146,22 +146,7 @@ pkgs.stdenvNoCC.mkDerivation {
     runtime="$out/share/quickshell/inir"
     mkdir -p "$runtime" "$out/bin"
 
-    while IFS= read -r path; do
-      [ -n "$path" ] || continue
-      install -Dm644 "$path" "$runtime/$path"
-    done < sdata/runtime-root-files.txt
-
-    while IFS= read -r dir; do
-      [ -n "$dir" ] || continue
-      cp -R "$dir" "$runtime/$dir"
-    done < sdata/runtime-payload-dirs.txt
-
-    # Copy root-level QML entry points (shell.qml, settings.qml, etc.)
-    # which aren't listed in runtime-root-files.txt.
-    for f in *.qml; do
-      [ -f "$f" ] || continue
-      install -Dm644 "$f" "$runtime/$f"
-    done
+    python3 sdata/lib/runtime-payload.py copy --root . --target "$runtime"
 
     chmod +x "$runtime/setup" "$runtime/scripts/inir"
     find "$runtime/scripts" -type f \( -name '*.sh' -o -name '*.fish' -o -name '*.py' \) -exec chmod +x {} \;
