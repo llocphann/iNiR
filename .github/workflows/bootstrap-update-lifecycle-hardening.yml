@@ -6,6 +6,7 @@ on:
       - fix/update-lifecycle-hardening-20260905
     paths:
       - tools/apply-update-lifecycle-hardening.py
+      - tools/apply-test-contract-refresh.py
       - scripts/qml-check.fish
       - .github/workflows/bootstrap-update-lifecycle-hardening.yml
 
@@ -24,11 +25,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y fish jq rsync
-          if apt-cache show qt6-declarative-dev-tools >/dev/null 2>&1; then
-            sudo apt-get install -y qt6-declarative-dev-tools
-          fi
 
-      - name: Apply hardening patch
+      - name: Apply hardening patches
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -41,6 +39,7 @@ jobs:
           path.write_text(text)
           PY
           python3 tools/apply-update-lifecycle-hardening.py
+          python3 tools/apply-test-contract-refresh.py
 
       - name: Validate shell syntax and policy files
         run: |
@@ -50,8 +49,13 @@ jobs:
           bash -n sdata/lib/snapshots.sh
           bash -n scripts/test-update-lifecycle.sh
           bash -n scripts/test-local-distribution.sh
+          bash -n scripts/test-battery-charge-limit-helper.sh
+          bash -n distro/arch/inir-shell/PKGBUILD
+          bash -n distro/arch/inir-shell-git/PKGBUILD
+          bash -n distro/arch/inir-meta/PKGBUILD
           python3 -m json.tool sdata/runtime-exclusions.json >/dev/null
-          python3 -m py_compile sdata/lib/runtime-payload.py tools/apply-update-lifecycle-hardening.py
+          python3 -m py_compile sdata/lib/runtime-payload.py tools/apply-update-lifecycle-hardening.py tools/apply-test-contract-refresh.py
+          make -n install PREFIX=/tmp/inir-stage-test >/dev/null
 
       - name: Run lifecycle regression tests
         run: |
@@ -74,6 +78,12 @@ jobs:
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add setup sdata/lib/functions.sh sdata/lib/robust-update.sh sdata/lib/snapshots.sh scripts/test-local-distribution.sh
+          git add \
+            setup \
+            sdata/lib/functions.sh \
+            sdata/lib/robust-update.sh \
+            sdata/lib/snapshots.sh \
+            scripts/test-local-distribution.sh \
+            scripts/test-battery-charge-limit-helper.sh
           git commit -m 'fix(update): harden verification and lifecycle'
           git push
