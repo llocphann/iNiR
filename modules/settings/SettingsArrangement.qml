@@ -21,10 +21,19 @@ QtObject {
     }
 
     function save(snapshot): void {
+        // The internal data registry still has the historical page 28 so its
+        // existing arrangement sanitizer remains reusable. Persist 28 as an
+        // implementation-only hidden index to stop it being re-added as a
+        // missing "More" page. The public registry facade filters it out, so
+        // users never see it in navigation or Arrange.
+        const hidden = (Array.isArray(snapshot.hidden) ? snapshot.hidden : [])
+            .filter(index => index !== root.retiredTlpPageIndex)
+        hidden.push(root.retiredTlpPageIndex)
+
         Config.setNestedValue("settingsUi.categories", JSON.stringify({
             version: root.layoutSchemaVersion,
             groups: snapshot.groups,
-            hidden: snapshot.hidden
+            hidden: hidden
         }))
     }
 
