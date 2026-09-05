@@ -25,7 +25,18 @@ jobs:
           sudo apt-get install -y fish jq rsync
 
       - name: Apply hardening patch
-        run: python3 tools/apply-update-lifecycle-hardening.py
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('tools/apply-update-lifecycle-hardening.py')
+          text = path.read_text()
+          text = text.replace(
+              'helper_marker = "repair_update_owned_state() {"',
+              'helper_marker = "###############################################################################\\n# Help\\n###############################################################################"',
+          )
+          path.write_text(text)
+          PY
+          python3 tools/apply-update-lifecycle-hardening.py
 
       - name: Validate shell syntax and policy files
         run: |
@@ -52,6 +63,7 @@ jobs:
 
       - name: Commit generated fix
         run: |
+          git checkout -- tools/apply-update-lifecycle-hardening.py
           if git diff --quiet; then
             echo 'No generated changes'
             exit 0
