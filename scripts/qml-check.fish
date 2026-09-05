@@ -43,6 +43,27 @@ for candidate in qmlformat qmlformat6 /usr/lib/qt6/bin/qmlformat /usr/lib/x86_64
     end
 end
 
+# Ubuntu 24.04 ships qmlformat 6.4, which rejects valid modern syntax used by
+# current iNiR/Quickshell QML. Treat an old parser as unavailable instead of
+# producing dozens of false startup failures. Arch/current Qt (>= 6.8) gets the
+# real parser pass; the project-specific guards below always run regardless.
+set -l parser_skip_reason ""
+if test -n "$parser"
+    set -l version_text ($parser --version 2>&1)
+    set -l parser_version (string match -r -o '[0-9]+\.[0-9]+(\.[0-9]+)?' -- $version_text | head -1)
+    if test -z "$parser_version"
+        set parser_skip_reason "qmlformat version could not be determined"
+        set parser ""
+    else
+        set -l parts (string split . $parser_version)
+        set -l version_key (math "$parts[1] * 100 + $parts[2]")
+        if test $version_key -lt 608
+            set parser_skip_reason "qmlformat $parser_version is too old for project syntax"
+            set parser ""
+        end
+    end
+end
+
 set -l qml_files
 if test (count $positional) -gt 0
     for file in $positional
@@ -116,7 +137,11 @@ for file in $qml_files
 end
 
 if test -z "$parser"
-    echo "qml-check: qmlformat unavailable; startup guards ran, parser pass skipped" >&2
+    if test -n "$parser_skip_reason"
+        echo "qml-check: $parser_skip_reason; parser pass skipped" >&2
+    else
+        echo "qml-check: qmlformat unavailable; startup guards ran, parser pass skipped" >&2
+    end
 end
 
 if test $fatal_errors -gt 0
