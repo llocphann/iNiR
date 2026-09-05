@@ -6,6 +6,7 @@ on:
       - fix/update-lifecycle-hardening-20260905
     paths:
       - tools/apply-update-lifecycle-hardening.py
+      - scripts/qml-check.fish
       - .github/workflows/bootstrap-update-lifecycle-hardening.yml
 
 permissions:
@@ -23,6 +24,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y fish jq rsync
+          if apt-cache show qt6-declarative-dev-tools >/dev/null 2>&1; then
+            sudo apt-get install -y qt6-declarative-dev-tools
+          fi
 
       - name: Apply hardening patch
         run: |
