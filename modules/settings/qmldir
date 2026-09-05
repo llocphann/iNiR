@@ -1,4 +1,5 @@
 module qs.modules.settings
+singleton SettingsPageRegistryData 1.0 SettingsPageRegistryData.qml
 singleton SettingsPageRegistry 1.0 SettingsPageRegistry.qml
 singleton SettingsArrangement 1.0 SettingsArrangement.qml
 singleton SettingsChromeLayout 1.0 SettingsChromeLayout.qml
