@@ -620,6 +620,16 @@ On-screen volume indicator.
 
 ---
 
+### osdInput
+
+Input-device OSD notifications. Used by keyboard/touchpad helpers to show the effective input state.
+
+| Function | Description |
+|----------|-------------|
+| `touchpad <state>` | Show touchpad state (`on` or `off`) |
+
+---
+
 ### cliphistService
 
 Clipboard history service. The backend that makes clipboard panel work. You probably don't need to call this directly.

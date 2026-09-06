@@ -971,16 +971,14 @@ test_tlp_settings_ui_uses_schema_groups_and_batched_apply() {
         'settings service must build one privileged Apply command' || return 1
     assert_not_contains 'applyOnLeave' "$settings_service" \
         'settings service must require explicit Apply'
-    assert_contains 'settingsPageName: Translation.tr("Battery")' "$classic_page" \
-        'classic Battery page must remain registered'
+    assert_contains 'GeneralConfig {' "$classic_page" \
+        'legacy TLP direct links must redirect into the canonical System page'
+    assert_contains 'activeSection: "power"' "$classic_page" \
+        'legacy TLP direct links must land on System → Power'
     assert_contains 'pageTitle: Translation.tr("Battery")' "$waffle_page" \
         'Waffle Battery page must remain registered'
-    assert_contains 'model: root.visibleGroups' "$classic_page" \
-        'classic page must render schema groups'
     assert_contains 'model: root.visibleGroups' "$waffle_page" \
         'Waffle page must render schema groups'
-    assert_contains 'onClicked: TlpSettingsService.apply()' "$classic_page" \
-        'classic page must expose explicit Apply'
     assert_contains 'onButtonClicked: TlpSettingsService.apply()' "$waffle_page" \
         'Waffle page must expose explicit Apply'
 }

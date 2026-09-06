@@ -19,6 +19,8 @@ bash -n \
     "$runtime_root/setup" \
     "$runtime_root/scripts/inir" \
     "$runtime_root/scripts/test-tlp-integration-lifecycle.sh" \
+    "$runtime_root/scripts/test-tlp-settings-ui-guards.sh" \
+    "$runtime_root/scripts/test-update-lifecycle.sh" \
     "$runtime_root/sdata/lib/"*.sh \
     "$runtime_root/sdata/subcmd-install/"*.sh \
     "$runtime_root/sdata/migrations/"*.sh
@@ -31,6 +33,12 @@ sh "$runtime_root/scripts/test-battery-charge-limit-helper.sh"
 
 step "TLP integration lifecycle"
 bash "$runtime_root/scripts/test-tlp-integration-lifecycle.sh"
+
+step "TLP settings UI guards"
+bash "$runtime_root/scripts/test-tlp-settings-ui-guards.sh"
+
+step "update lifecycle regression"
+bash "$runtime_root/scripts/test-update-lifecycle.sh"
 
 step "session tray ordering"
 service_unit="$runtime_root/assets/systemd/inir.service"
@@ -51,6 +59,7 @@ step "fresh install defaults"
 python3 - "$runtime_root" <<'PY'
 import json
 import pathlib
+import re
 import sys
 
 root = pathlib.Path(sys.argv[1])
@@ -89,8 +98,8 @@ schema_checks = {
     "schema dock not hover-only": "property bool hoverToReveal: false" in schema,
     "schema right sidebar full height": "property bool collapseEmptyNotifications: false" in schema,
     "schema left sidebar full height": "property bool collapseWidgetsTab: false" in schema,
-    "schema wallhaven tab": "property JsonObject wallhaven: JsonObject {\n                    // Enable/disable the Wallhaven tab in the left sidebar\n                    property bool enable: true" in schema,
-    "schema news tab": "property JsonObject news: JsonObject {\n                    property bool enable: true" in schema,
+    "schema wallhaven tab": re.search(r"property JsonObject wallhaven: JsonObject \{[\s\S]{0,900}?property bool enable:\s*true", schema) is not None,
+    "schema news tab": re.search(r"property JsonObject news: JsonObject \{[\s\S]{0,900}?property bool enable:\s*true", schema) is not None,
     "wizard applies initial profile": "root.applyProfile(root.selectedProfile)" in wizard,
     "wizard dock pinned": '"dock.pinnedOnStartup": true' in wizard,
     "wizard dock not hover-only": '"dock.hoverToReveal": false' in wizard,
@@ -140,38 +149,29 @@ if ! grep -Fq 'quickshell/user/desktop-items.json' "$snapshot_lib" \
     exit 1
 fi
 
-step "mascot runtime manifest"
-mascot_manifest="$runtime_root/assets/images/mascot/manifest.json"
-if [[ ! -f "$mascot_manifest" ]]; then
-    printf 'FAIL: mascot runtime manifest is missing: %s\n' "$mascot_manifest" >&2
+step "canonical runtime payload"
+payload_tool="$runtime_root/sdata/lib/runtime-payload.py"
+payload_list="$(mktemp)"
+trap 'rm -f "$payload_list"' EXIT
+python3 "$payload_tool" list --root "$runtime_root" > "$payload_list"
+if ! grep -qx 'assets/images/mascot/manifest.json' "$payload_list"; then
+    printf 'FAIL: mascot runtime manifest is missing from canonical payload\n' >&2
     exit 1
 fi
-python3 -m json.tool "$mascot_manifest" >/dev/null
-if ! grep -qx 'assets' "$runtime_root/sdata/runtime-payload-dirs.txt"; then
-    printf 'FAIL: assets is absent from runtime-payload-dirs.txt\n' >&2
-    exit 1
-fi
-if grep -q -- "--exclude='assets/images/mascot/manifest.json'" "$runtime_root/sdata/lib/functions.sh"; then
-    printf 'FAIL: repo-copy sync excludes the mascot runtime manifest\n' >&2
-    exit 1
-fi
-# Payload directories are copied one at a time, so these are relative to
-# assets/ — an 'assets/…' prefix here never matches and the art ships.
-for local_mascot_path in \
-    "images/mascot/*.png" \
-    "images/mascot/*.gif" \
-    "images/mascot/frames/" \
-    "images/mascot/PROMPTS.md"; do
-    if ! grep -Fq -- "--exclude='$local_mascot_path'" "$runtime_root/sdata/lib/functions.sh"; then
-        printf 'FAIL: repo-copy sync can leak local mascot artifact: %s\n' "$local_mascot_path" >&2
+for forbidden in \
+    'assets/images/mascot/frames/' \
+    'assets/images/mascot/PROMPTS.md'; do
+    if grep -Fq "$forbidden" "$payload_list"; then
+        printf 'FAIL: canonical payload leaks local mascot artifact: %s\n' "$forbidden" >&2
         exit 1
     fi
 done
-if ! grep -q "inir-mascot-.*\\.png" "$runtime_root/Makefile" \
-        || ! grep -q "inir-mascot-.*\\.gif" "$runtime_root/Makefile" \
-        || ! grep -q 'PROMPTS.md' "$runtime_root/Makefile" \
-        || ! grep -q 'assets/images/mascot/frames' "$runtime_root/Makefile"; then
-    printf 'FAIL: make install does not strip local mascot art/tooling\n' >&2
+if grep -Eq '^assets/images/mascot/.*\.(png|gif)$' "$payload_list"; then
+    printf 'FAIL: canonical payload leaks local mascot image artifacts\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'runtime-payload.py copy' "$runtime_root/Makefile"; then
+    printf 'FAIL: make install does not use the canonical runtime payload policy\n' >&2
     exit 1
 fi
 
@@ -202,8 +202,8 @@ if [[ -d "$runtime_root/distro/arch" ]]; then
 fi
 
 step "launcher resolution"
-bash "$launcher" path >/dev/null
-bash "$launcher" status >/dev/null
+INIR_RUNTIME_DIR="$runtime_root" bash "$launcher" path >/dev/null
+INIR_RUNTIME_DIR="$runtime_root" bash "$launcher" status >/dev/null
 
 step "application launch environment"
 # XWayland is not guaranteed to own :0. Preserve live DISPLAY discovery and validation.
@@ -245,97 +245,53 @@ if [[ "$run_runtime" == true ]]; then
     bash "$launcher" ipc shellUpdate diagnose >/dev/null
 fi
 
-step "agent artifact leak guard"
-# The source tree legitimately has AGENTS.md/CLAUDE.md in payload dirs.
-# Distribution stripping removes them post-copy. Validate the stripping
-# contracts exist so no install path can miss them.
-leak_guard=0
-agent_files=(AGENTS.md CLAUDE.md CODEX.md PI.md codemap.md .mcp.json opencode.json skills-lock.json)
+step "runtime payload boundary"
+# Validate delivered output, not duplicated implementation-specific exclude lists.
+agent_names=(AGENTS.md CLAUDE.md CODEX.md PI.md codemap.md .mcp.json opencode.json skills-lock.json)
 agent_dirs=(.claude .factory .opencode .codex .agents .codebase-memory .impeccable .pi-subagents)
-
-# Makefile must strip agent files after cp -a
-for agent_file in "${agent_files[@]}"; do
-    if ! grep -q -- "-name $agent_file" "$runtime_root/Makefile" 2>/dev/null; then
-        printf 'LEAK GUARD: Makefile missing strip for %s\n' "$agent_file" >&2
-        leak_guard=1
+for name in "${agent_names[@]}"; do
+    if grep -Eq "(^|/)${name//./\.}$" "$payload_list"; then
+        printf 'FAIL: canonical payload leaks agent artifact: %s\n' "$name" >&2
+        exit 1
     fi
 done
-for agent_dir in "${agent_dirs[@]}"; do
-    if ! grep -q -- "-name $agent_dir" "$runtime_root/Makefile" 2>/dev/null; then
-        printf 'LEAK GUARD: Makefile missing strip for %s/\n' "$agent_dir" >&2
-        leak_guard=1
+for name in "${agent_dirs[@]}"; do
+    escaped="${name//./\.}"
+    if grep -Eq "(^|/)${escaped}(/|$)" "$payload_list"; then
+        printf 'FAIL: canonical payload leaks agent directory: %s\n' "$name" >&2
+        exit 1
     fi
 done
-if ! grep -q -- '-delete' "$runtime_root/Makefile" 2>/dev/null; then
-    printf 'LEAK GUARD: Makefile missing agent-file strip after payload copy\n' >&2
-    leak_guard=1
-fi
-# rsync-based install (sdata/lib/functions.sh) must exclude agent files
-if [[ -f "$runtime_root/sdata/lib/functions.sh" ]]; then
-    for agent_file in "${agent_files[@]}"; do
-        [[ "$agent_file" == .mcp.json || "$agent_file" == opencode.json ]] && continue
-        if ! grep -q -- "--exclude='$agent_file'" "$runtime_root/sdata/lib/functions.sh" 2>/dev/null; then
-            printf 'LEAK GUARD: sdata/lib/functions.sh missing %s rsync exclude\n' "$agent_file" >&2
-            leak_guard=1
-        fi
-    done
-    for agent_dir in "${agent_dirs[@]}"; do
-        if ! grep -q -- "--exclude='$agent_dir/'" "$runtime_root/sdata/lib/functions.sh" 2>/dev/null; then
-            printf 'LEAK GUARD: sdata/lib/functions.sh missing %s/ rsync exclude\n' "$agent_dir" >&2
-            leak_guard=1
-        fi
-    done
-fi
-# Agent-only directories must not appear in payload manifests
-for agent_dir in "${agent_dirs[@]}"; do
-    if grep -qx "$agent_dir" "$runtime_root/sdata/runtime-payload-dirs.txt" 2>/dev/null; then
-        printf 'LEAK: %s listed in runtime-payload-dirs.txt\n' "$agent_dir" >&2
-        leak_guard=1
-    fi
-done
-for agent_file in "${agent_files[@]}"; do
-    if grep -qx "$agent_file" "$runtime_root/sdata/runtime-root-files.txt" 2>/dev/null; then
-        printf 'LEAK: %s listed in runtime-root-files.txt\n' "$agent_file" >&2
-        leak_guard=1
-    fi
-done
-# Maintainer and development tooling must be stripped by both install paths.
-dev_tooling_files=(release.sh wiki-sync.sh verify-docs.sh qml-check.fish
-    test-local-distribution.sh test-mascot-pack-flow.sh
-    test-battery-charge-limit-helper.sh test-tlp-integration-lifecycle.sh)
-dev_tooling_dirs=(agents tools l10n)
-for tool in "${dev_tooling_files[@]}" "${dev_tooling_dirs[@]}"; do
-    pattern="--exclude='/$tool'"
-    [[ " ${dev_tooling_dirs[*]} " == *" $tool "* ]] && pattern="--exclude='/$tool/'"
-    if ! grep -q -- "$pattern" "$runtime_root/sdata/lib/functions.sh" 2>/dev/null; then
-        printf 'LEAK GUARD: sdata/lib/functions.sh missing %s rsync exclude\n' "$tool" >&2
-        leak_guard=1
-    fi
-    if ! grep -q -- "/$tool" "$runtime_root/Makefile" 2>/dev/null; then
-        printf 'LEAK GUARD: Makefile missing strip for %s\n' "$tool" >&2
-        leak_guard=1
+for forbidden in \
+    scripts/release.sh \
+    scripts/wiki-sync.sh \
+    scripts/verify-docs.sh \
+    scripts/qml-check.fish \
+    scripts/test-local-distribution.sh \
+    scripts/test-mascot-pack-flow.sh \
+    scripts/test-battery-charge-limit-helper.sh \
+    scripts/test-tlp-integration-lifecycle.sh \
+    scripts/test-tlp-settings-ui-guards.sh \
+    scripts/test-update-lifecycle.sh \
+    tools/; do
+    if grep -Fq "$forbidden" "$payload_list"; then
+        printf 'FAIL: canonical payload leaks development tooling: %s\n' "$forbidden" >&2
+        exit 1
     fi
 done
 
-for pkgbuild in "$runtime_root/distro/arch/inir-shell/PKGBUILD" "$runtime_root/distro/arch/inir-shell-git/PKGBUILD"; do
-    [[ -f "$pkgbuild" ]] || continue
-    for agent_file in "${agent_files[@]}"; do
-        if ! grep -q -- "-name $agent_file" "$pkgbuild" 2>/dev/null; then
-            printf 'LEAK GUARD: %s missing strip for %s\n' "$(basename "$(dirname "$pkgbuild")")/PKGBUILD" "$agent_file" >&2
-            leak_guard=1
-        fi
-    done
-    for agent_dir in "${agent_dirs[@]}"; do
-        if ! grep -q -- "-name $agent_dir" "$pkgbuild" 2>/dev/null; then
-            printf 'LEAK GUARD: %s missing strip for %s/\n' "$(basename "$(dirname "$pkgbuild")")/PKGBUILD" "$agent_dir" >&2
-            leak_guard=1
-        fi
-    done
+for consumer in \
+    "$runtime_root/Makefile" \
+    "$runtime_root/distro/arch/inir-shell/PKGBUILD" \
+    "$runtime_root/distro/arch/inir-shell-git/PKGBUILD" \
+    "$runtime_root/nix/package.nix"; do
+    [[ -f "$consumer" ]] || continue
+    if ! grep -Fq 'runtime-payload.py' "$consumer"; then
+        printf 'FAIL: %s bypasses canonical runtime payload policy\n' "${consumer#$runtime_root/}" >&2
+        exit 1
+    fi
 done
-
-if [[ "$leak_guard" -eq 1 ]]; then
-    printf 'FAIL: agent artifact distribution guard failed\n' >&2
-    exit 1
-fi
+rm -f "$payload_list"
+trap - EXIT
 
 printf '\nAll local distribution checks passed.\n'

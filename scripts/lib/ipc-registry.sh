@@ -2,8 +2,8 @@
 # Auto-generated from QML IpcHandler declarations + docs/IPC.md metadata.
 # Do not edit manually.
 # Regenerate: python3 scripts/lib/generate-ipc-registry.py
-# IPC.md hash: 0ae8f17d01055f37
-# Targets: 61
+# IPC.md hash: 192e0c9148fa04b4
+# Targets: 62
 
 declare -gA IPC_TARGET_DESC=(
   [ai]="Shared multi-provider AI service. It supports Gemini, OpenAI-compatible chat and Responses APIs, Mistral and Anthropic; live provider catalogs are normalized into capability-aware model records. Catalog visibility is separate from execution readiness, so public model lists remain browseable without pretending an API key exists. OpenCode Zen and Go resolve their current model lists and per-model API routes dynamically. Normal shell tools use typed actions and approval cards, while arbitrary commands are isolated in Advanced mode."
@@ -36,6 +36,7 @@ declare -gA IPC_TARGET_DESC=(
   [notifications]="Notification management."
   [orbit]="Niri-only Material session navigator for the ii family. Orbit presents nearby workspaces and readable window previews, with MRU Trail navigation and temporary Stash parking."
   [osd]="Waffle on-screen display indicator (volume, brightness)."
+  [osdInput]="Input-device OSD notifications. Used by keyboard/touchpad helpers to show the effective input state."
   [osdVolume]="On-screen volume indicator."
   [osk]="On-screen keyboard."
   [overlay]="Floating tools (Super+G): notes, images, crosshair, recorder, resources and other pinnable desktop tools."
@@ -100,6 +101,7 @@ declare -gA IPC_TARGET_FAMILY=(
   [notifications]="shared"
   [orbit]="shared"
   [osd]="waffle"
+  [osdInput]="shared"
   [osdVolume]="shared"
   [osk]="shared"
   [overlay]="shared"
@@ -164,6 +166,7 @@ declare -gA IPC_TARGET_FUNCTIONS=(
   [notifications]="test clearAll toggleSilent"
   [orbit]="toggle close open pocket studio find stage orbital next previous status toggleView"
   [osd]="trigger"
+  [osdInput]="touchpad"
   [osdVolume]="trigger hide toggle"
   [osk]="toggle close open"
   [overlay]="toggle"
@@ -330,9 +333,10 @@ declare -gA IPC_FUNCTION_DESC=(
   ["orbit:orbital"]="Open Orbit in the Orbital workspace view for this session"
   ["orbit:next"]="Switch Niri to the next workspace while Orbit stays open"
   ["orbit:previous"]="Switch Niri to the previous workspace while Orbit stays open"
-  ["orbit:status"]="Print the effective Orbit runtime state"
+  ["orbit:status"]="Print the effective Orbit runtime state used by diagnostics and visual audits"
   ["orbit:toggleView"]="Switch the open Orbit session between Stage and Orbital"
   ["osd:trigger"]="Show the OSD indicator"
+  ["osdInput:touchpad"]="Show touchpad state (\`on\` or \`off\`)"
   ["osdVolume:trigger"]="Show volume OSD"
   ["osdVolume:hide"]="Hide volume OSD"
   ["osdVolume:toggle"]="Toggle volume OSD"
@@ -501,6 +505,7 @@ declare -gA IPC_FUNCTION_ARGS=(
   ["minimize:restore"]="<windowId>"
   ["minimize:restoreOriginal"]="<windowId>"
   ["orbit:find"]="<query>"
+  ["osdInput:touchpad"]="<state>"
   ["packageSearch:search"]="<query>"
   ["panelFamily:set"]="<family>"
   ["pill:open"]="<surface>"
@@ -553,8 +558,8 @@ bind "Ctrl+Alt+A" { spawn "inir" "wallpaperSelector" "openLauncher" "animated"; 
   [ytmusic]='bind "Mod+M+Space" { spawn "inir" "ytmusic" "playPause"; }'
 )
 
-IPC_ALL_TARGETS=(ai altSwitcher appCatalog audio autostart background bar brightness cheatsheet clipboard cliphistService closeConfirm controlPanel coverflowSelector customWidgets dashboard dev gamemode globalActions keyboard lock mascot mascotMood mediaControls memory minimize mpris notifications orbit osd osdVolume osk overlay overview packageSearch panelFamily pill recordingOsd region search session settings settingsNav shellLayout shellUpdate sidebarLeft sidebarRight taskview tiling voiceSearch wactionCenter waffleAltSwitcher wallpaperLauncher wallpaperSelector wbar widgetpower wnotificationCenter workspaceStrip wwidgets ytmusic zoom)
-IPC_SHARED_TARGETS=(ai altSwitcher appCatalog audio background bar brightness cheatsheet clipboard cliphistService closeConfirm controlPanel coverflowSelector dashboard dev gamemode globalActions keyboard lock mascot mascotMood mediaControls memory minimize mpris notifications orbit osdVolume osk overlay overview packageSearch panelFamily pill region session settings settingsNav shellLayout shellUpdate sidebarLeft sidebarRight taskview tiling voiceSearch wallpaperLauncher wallpaperSelector workspaceStrip ytmusic zoom)
+IPC_ALL_TARGETS=(ai altSwitcher appCatalog audio autostart background bar brightness cheatsheet clipboard cliphistService closeConfirm controlPanel coverflowSelector customWidgets dashboard dev gamemode globalActions keyboard lock mascot mascotMood mediaControls memory minimize mpris notifications orbit osd osdInput osdVolume osk overlay overview packageSearch panelFamily pill recordingOsd region search session settings settingsNav shellLayout shellUpdate sidebarLeft sidebarRight taskview tiling voiceSearch wactionCenter waffleAltSwitcher wallpaperLauncher wallpaperSelector wbar widgetpower wnotificationCenter workspaceStrip wwidgets ytmusic zoom)
+IPC_SHARED_TARGETS=(ai altSwitcher appCatalog audio background bar brightness cheatsheet clipboard cliphistService closeConfirm controlPanel coverflowSelector dashboard dev gamemode globalActions keyboard lock mascot mascotMood mediaControls memory minimize mpris notifications orbit osdInput osdVolume osk overlay overview packageSearch panelFamily pill region session settings settingsNav shellLayout shellUpdate sidebarLeft sidebarRight taskview tiling voiceSearch wallpaperLauncher wallpaperSelector workspaceStrip ytmusic zoom)
 IPC_II_TARGETS=()
 IPC_WAFFLE_TARGETS=(autostart customWidgets osd recordingOsd search wactionCenter waffleAltSwitcher wbar widgetpower wnotificationCenter wwidgets)
 
@@ -569,6 +574,7 @@ declare -gA IPC_KEBAB_ALIASES=(
   [global-actions]=globalActions
   [mascot-mood]=mascotMood
   [media-controls]=mediaControls
+  [osd-input]=osdInput
   [osd-volume]=osdVolume
   [package-search]=packageSearch
   [panel-family]=panelFamily

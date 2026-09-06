@@ -153,9 +153,19 @@ restore_snapshot() {
     
     echo -e "${STY_CYAN}Restoring snapshot: ${snapshot_id}${STY_RST}"
     
-    # Stop shell
+    # Stop the shell through its lifecycle owner before replacing files.
     local runtime_target="${XDG_CONFIG_HOME}/quickshell/inir"
-    qs -p "$runtime_target" kill &>/dev/null || true
+    local runtime_launcher=""
+    if command -v inir >/dev/null 2>&1; then
+        runtime_launcher="$(command -v inir)"
+    elif [[ -x "${runtime_target}/scripts/inir" ]]; then
+        runtime_launcher="${runtime_target}/scripts/inir"
+    fi
+    if [[ -n "$runtime_launcher" ]]; then
+        INIR_RUNTIME_DIR="$runtime_target" "$runtime_launcher" kill -c "$runtime_target" >/dev/null 2>&1 || true
+    elif command -v systemctl >/dev/null 2>&1; then
+        systemctl --user stop inir.service >/dev/null 2>&1 || true
+    fi
     
     # Restore QML code
     if [[ -d "${snapshot_dir}/inir" ]]; then
@@ -209,17 +219,46 @@ restore_snapshot() {
     local version=$(jq -r '.version_before // "unknown"' "$meta" 2>/dev/null || echo "unknown")
     set_installed_version "$version" "$commit_before" "rollback"
     
-    # Restart shell (only if we have access to the session)
-    if [[ -n "$NIRI_SOCKET" ]] || [[ -n "$WAYLAND_DISPLAY" ]]; then
-        log_info "Starting shell..."
-        nohup qs -p "$runtime_target" >/dev/null 2>&1 &
-        disown
+    # Refresh launcher/service topology after the checkout moved backwards.
+    declare -F sync_launcher_from_repo >/dev/null 2>&1 && sync_launcher_from_repo >/dev/null 2>&1 || true
+    declare -F sync_user_inir_service_from_repo_if_present >/dev/null 2>&1 \
+        && sync_user_inir_service_from_repo_if_present >/dev/null 2>&1 || true
+    declare -F ensure_user_inir_service_enabled >/dev/null 2>&1 \
+        && ensure_user_inir_service_enabled >/dev/null 2>&1 || true
+
+    local session_active=false
+    if declare -F inir_supported_session_active >/dev/null 2>&1; then
+        inir_supported_session_active && session_active=true
+    elif [[ -n "${NIRI_SOCKET:-}" ]] || pgrep -x niri >/dev/null 2>&1 \
+            || [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] || pgrep -x Hyprland >/dev/null 2>&1; then
+        session_active=true
+    fi
+
+    if $session_active; then
+        log_info "Starting shell through the iNiR lifecycle..."
+        if declare -F restart_updated_shell >/dev/null 2>&1; then
+            if ! restart_updated_shell "$runtime_target"; then
+                log_error "Snapshot restored but shell restart failed"
+                return 1
+            fi
+        else
+            local restored_launcher=""
+            command -v inir >/dev/null 2>&1 && restored_launcher="$(command -v inir)"
+            [[ -z "$restored_launcher" && -x "${runtime_target}/scripts/inir" ]] \
+                && restored_launcher="${runtime_target}/scripts/inir"
+            if [[ -z "$restored_launcher" ]] \
+                    || ! INIR_RUNTIME_DIR="$runtime_target" "$restored_launcher" restart -q -c "$runtime_target"; then
+                log_error "Snapshot restored but no verified launcher restart was available"
+                return 1
+            fi
+        fi
         tui_success "Snapshot restored and shell restarted"
     else
-        tui_warn "Not in graphical session - shell restart skipped"
-        tui_info "Run: inir start (in your Niri session)"
+        tui_warn "No supported compositor session - shell restart skipped"
+        tui_info "Run: inir restart (from your Niri/Hyprland session)"
         tui_success "Snapshot restored"
     fi
+
 }
 
 ###############################################################################

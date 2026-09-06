@@ -285,6 +285,32 @@ ensure_user_inir_service_enabled() {
     return 0
 }
 
+inir_supported_session_active() {
+    # Never use WAYLAND_DISPLAY as a compositor detector: KDE/GNOME set it too.
+    [[ -n "${NIRI_SOCKET:-}" ]] && return 0
+    pgrep -x niri >/dev/null 2>&1 && return 0
+    [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] && return 0
+    pgrep -x Hyprland >/dev/null 2>&1
+}
+
+restart_updated_shell() {
+    local runtime_dir="$1"
+    local launcher=""
+
+    if [[ -x "${XDG_BIN_HOME}/inir" ]]; then
+        launcher="${XDG_BIN_HOME}/inir"
+    elif [[ -x "${REPO_ROOT}/scripts/inir" ]]; then
+        launcher="${REPO_ROOT}/scripts/inir"
+    elif [[ -x "${runtime_dir}/scripts/inir" ]]; then
+        launcher="${runtime_dir}/scripts/inir"
+    else
+        log_error "No iNiR launcher available for verified restart"
+        return 1
+    fi
+
+    INIR_RUNTIME_DIR="$runtime_dir" "$launcher" restart -q -c "$runtime_dir"
+}
+
 ###############################################################################
 # Help
 ###############################################################################
@@ -1997,9 +2023,22 @@ restore_single_user_mod() {
 _update_status_file="${XDG_STATE_HOME:-$HOME/.local/state}/quickshell/user/update-status"
 _update_total_steps=7
 
+_write_update_status() {
+    local status="$1"
+    local status_dir
+    status_dir="$(dirname "$_update_status_file")"
+    mkdir -p "$status_dir" 2>/dev/null || return 0
+    printf '%s\n' "$status" > "$_update_status_file" 2>/dev/null || true
+}
+
 _report_progress() {
     local step="$1" msg="$2"
-    echo "progress:${step}:${_update_total_steps}:${msg}" > "$_update_status_file" 2>/dev/null || true
+    _write_update_status "progress:${step}:${_update_total_steps}:${msg}"
+}
+
+_report_update_failure() {
+    local code="$1" msg="$2"
+    _write_update_status "failed:${code}:${msg}"
 }
 
 # Composed helpers: write the status marker AND start the animated visual line.
@@ -2095,7 +2134,7 @@ run_update_simulated() {
     tui_success "Python venv up to date"
 
     # Mirror the real flow's order: write success BEFORE the final "Restarting" marker.
-    echo "success" > "$_update_status_file" 2>/dev/null || true
+    _write_update_status "success"
 
     # Step 7 — fast atomic op: animated spinner
     _step_phase_start 7 "Restarting shell"
@@ -2187,7 +2226,7 @@ run_update() {
         ensure_user_inir_service_enabled >/dev/null 2>&1 || true
         # Only start inir if we're running under a supported compositor.
         # WAYLAND_DISPLAY alone is not enough — KDE/GNOME set it too.
-        if [[ -n "${NIRI_SOCKET:-}" ]] || pgrep -x niri &>/dev/null || pgrep -x Hyprland &>/dev/null; then
+        if inir_supported_session_active; then
             systemctl --user reset-failed inir.service >/dev/null 2>&1 || true
             systemctl --user start inir.service >/dev/null 2>&1 || true
         fi
@@ -2201,7 +2240,7 @@ run_update() {
 
         echo ""
         tui_success "Package-managed installation left unchanged"
-        echo "success" > "$_update_status_file" 2>/dev/null || true
+        _write_update_status "success"
         return 0
     fi
 
@@ -2297,16 +2336,32 @@ run_update() {
             tui_info "Detected existing installation without version tracking"
         elif [[ "$installed_commit" == "$repo_commit" ]]; then
             tui_success "Already up to date ($installed_ver)"
-            echo "success" > "$_update_status_file" 2>/dev/null || true
 
-            local pending=$(count_pending_migrations)
+            local pending=$(count_pending_migrations 2>/dev/null || echo "0")
             if [[ "$pending" -gt 0 ]]; then
                 echo ""
-                tui_warn "$pending pending migration(s) available"
-                if $ask && tui_confirm "Apply migrations now?"; then
-                    run_migrations_interactive
+                if ! run_migrations_auto; then
+                    _report_update_failure "migration" "Required migration failed"
+                    tui_error "Required migration failed"
+                    return 1
+                fi
+                pending=$(count_pending_migrations 2>/dev/null || echo "0")
+                if [[ "$pending" -gt 0 ]]; then
+                    tui_warn "$pending optional migration(s) available"
+                    if $ask && tui_confirm "Review and apply now?"; then
+                        run_migrations_interactive
+                    fi
                 fi
             fi
+
+            if ! sync_launcher_from_repo >/dev/null; then
+                _report_update_failure "launcher" "Launcher refresh failed"
+                tui_error "Could not refresh the iNiR launcher"
+                return 1
+            fi
+            sync_user_inir_service_from_repo_if_present >/dev/null 2>&1 || true
+            ensure_user_inir_service_enabled >/dev/null 2>&1 || true
+            _write_update_status "success"
             return 0
         else
             # Local repo ahead of installed - create snapshot
@@ -2334,6 +2389,16 @@ run_update() {
     # Check if source and target are the same (dev setup)
     local src_real=$(realpath "$II_SOURCE" 2>/dev/null || echo "$II_SOURCE")
     local tgt_real=$(realpath "$II_TARGET" 2>/dev/null || echo "$II_TARGET")
+
+    local runtime_backup_path=""
+    if [[ "$src_real" != "$tgt_real" && -f "${II_TARGET}/shell.qml" ]]; then
+        runtime_backup_path=$(create_update_backup "$II_TARGET" 2>/dev/null || true)
+        if [[ -z "$runtime_backup_path" ]]; then
+            _report_update_failure "backup" "Runtime backup failed"
+            tui_error "Could not create the pre-update runtime backup"
+            return 1
+        fi
+    fi
 
     if [[ "$src_real" != "$tgt_real" ]]; then
         local runtime_compare_dir="$II_TARGET"
@@ -2417,7 +2482,17 @@ run_update() {
         if [[ -f "$runtime_dirs_manifest" ]]; then
             while IFS= read -r dir; do
                 [[ -n "$dir" ]] || continue
-                [[ -d "${II_SOURCE}/${dir}" ]] && mkdir -p "${II_TARGET}/${dir}" && rsync -a --delete --exclude='AGENTS.md' "${II_SOURCE}/${dir}/" "${II_TARGET}/${dir}/"
+                if [[ -d "${II_SOURCE}/${dir}" ]]; then
+                    mkdir -p "${II_TARGET}/${dir}"
+                    if ! python3 "${II_SOURCE}/sdata/lib/runtime-payload.py" sync-dir \
+                            --root "$II_SOURCE" --subdir "$dir" \
+                            --target "${II_TARGET}/${dir}" --delete; then
+                        _report_update_failure "payload" "Runtime payload sync failed"
+                        [[ -n "$runtime_backup_path" ]] && rollback_update >/dev/null 2>&1 || true
+                        tui_error "Runtime payload sync failed"
+                        return 1
+                    fi
+                fi
             done < "$runtime_dirs_manifest"
         fi
 
@@ -2432,11 +2507,21 @@ run_update() {
         fi
     fi
 
-    # Generate manifest
-    generate_manifest "$II_SOURCE" "${II_TARGET}/.inir-manifest"
+    # Generate the installed manifest from the same policy used to copy files.
+    if ! generate_manifest "$II_SOURCE" "${II_TARGET}/.inir-manifest"; then
+        _report_update_failure "manifest" "Runtime manifest generation failed"
+        [[ -n "$runtime_backup_path" ]] && rollback_update >/dev/null 2>&1 || true
+        tui_error "Runtime manifest generation failed"
+        return 1
+    fi
 
-    # Remove orphan files left from previous versions
-    cleanup_orphans "$II_TARGET" "${II_TARGET}/.inir-manifest"
+    # Remove managed source-only files left by older updater implementations.
+    if ! cleanup_orphans "$II_TARGET" "${II_TARGET}/.inir-manifest"; then
+        _report_update_failure "cleanup" "Runtime orphan cleanup failed"
+        [[ -n "$runtime_backup_path" ]] && rollback_update >/dev/null 2>&1 || true
+        tui_error "Runtime orphan cleanup failed"
+        return 1
+    fi
 
     # Fix permissions
     find "$II_TARGET/scripts" \( -name "*.sh" -o -name "*.fish" -o -name "*.py" \) -exec chmod +x {} \; 2>/dev/null || true
@@ -2444,9 +2529,12 @@ run_update() {
 
     local launcher_target="${XDG_BIN_HOME}/inir"
     if [[ -f "${REPO_ROOT}/scripts/inir" ]]; then
-        mkdir -p "$XDG_BIN_HOME"
-        cp -f "${REPO_ROOT}/scripts/inir" "$launcher_target"
-        chmod +x "$launcher_target"
+        if ! sync_launcher_from_repo >/dev/null; then
+            _report_update_failure "launcher" "Launcher refresh failed"
+            [[ -n "$runtime_backup_path" ]] && rollback_update >/dev/null 2>&1 || true
+            tui_error "Could not refresh the iNiR launcher"
+            return 1
+        fi
         ensure_launcher_path_in_shells "$XDG_BIN_HOME"
         if ! command -v inir &>/dev/null && [[ ":$PATH:" != *":${XDG_BIN_HOME}:"* ]]; then
             tui_warn "Launcher installed to ${launcher_target}, but ${XDG_BIN_HOME} is not in PATH for this shell"
@@ -2471,16 +2559,6 @@ run_update() {
         sed "s|^Exec=.*|Exec=${launcher_target//&/\\&} settings|" "${REPO_ROOT}/assets/applications/inir-settings.desktop" > "$settings_tmp"
         cp -f "$settings_tmp" "${applications_dir}/inir-settings.desktop"
         rm -f "$settings_tmp"
-    fi
-
-    # Update version
-    set_installed_version "$repo_ver" "$repo_commit" "update"
-
-    # Write runtime version.json only for repo-copy (separate target dir).
-    # For repo-link (src==tgt) this would pollute the repo root — skip it;
-    # the canonical tracking is already in the config dir via set_installed_version.
-    if [[ -d "$II_TARGET" && "$src_real" != "$tgt_real" ]]; then
-        write_version_info_json "${II_TARGET}/version.json" "$repo_ver" "$repo_commit" "setup-update"
     fi
 
     tui_success "Files synced"
@@ -2702,34 +2780,54 @@ run_update() {
         tui_success "Python packages (skipped - uv not available)"
     fi
 
-    # Signal success to the shell UI before restart
-    echo "success" > "$_update_status_file" 2>/dev/null || true
-
-    # Restart shell (only if we have access to the session)
-    if [[ -n "$NIRI_SOCKET" ]] || [[ -n "$WAYLAND_DISPLAY" ]]; then
-        _step_phase_start 7 "Restarting shell"
-        if command -v systemctl >/dev/null 2>&1 && systemctl --user cat inir.service >/dev/null 2>&1; then
-            nohup systemctl --user restart inir.service >/dev/null 2>&1 &
-            disown
-        elif [[ -x "${II_TARGET}/scripts/inir" ]]; then
-            nohup bash "${II_TARGET}/scripts/inir" restart -c "${II_TARGET}" >/dev/null 2>&1 &
-            disown
-        else
-            qs -p "${II_TARGET}" kill 2>/dev/null || true
-            sleep 1
-            nohup qs -p "${II_TARGET}" >/dev/null 2>&1 &
-            disown
+    # Validate the installed payload before touching the live shell. This catches
+    # parser/startup-critical problems even when there is no graphical session.
+    if ! run_verification static; then
+        _report_update_failure "verification" "Static verification failed"
+        if [[ -n "$runtime_backup_path" ]]; then
+            rollback_update >/dev/null 2>&1 || true
         fi
-        _step_phase_done "Shell restart triggered"
-    else
-        _step_phase_header 7 "Restarting shell"
-        tui_warn "Not in graphical session - shell restart skipped"
-        tui_info "The shell will use new files on next restart"
-        tui_info "Or run: inir restart"
+        tui_error "Update verification failed; the previous repo-copy runtime was restored when possible"
+        return 1
     fi
 
+    # Restart only in an explicitly supported compositor session. The launcher
+    # owns the systemd/direct-process lifecycle and waits for the new shell.
+    if inir_supported_session_active; then
+        _step_phase_start 7 "Restarting shell"
+        if ! restart_updated_shell "$II_TARGET"; then
+            _step_phase_fail "Shell failed to restart"
+            _report_update_failure "restart" "Shell failed to restart"
+            if [[ -n "$runtime_backup_path" ]]; then
+                tui_warn "Restoring the previous runtime payload..."
+                if rollback_update >/dev/null 2>&1; then
+                    restart_updated_shell "$II_TARGET" >/dev/null 2>&1 || true
+                fi
+            fi
+            tui_error "The updated shell did not start successfully"
+            tui_info "Run './setup rollback' if this is a repo-link checkout."
+            return 1
+        fi
+        _step_phase_done "Shell restarted and verified"
+    else
+        _step_phase_header 7 "Restarting shell"
+        _step_phase_skip "No active Niri/Hyprland session; restart deferred"
+        tui_info "The shell will use the new files on the next supported compositor session"
+    fi
+
+    # Commit version metadata only after migrations, validation and live restart
+    # (when applicable) have succeeded.
+    set_installed_version "$repo_ver" "$repo_commit" "update"
+    if [[ -d "$II_TARGET" && "$src_real" != "$tgt_real" ]]; then
+        write_version_info_json "${II_TARGET}/version.json" "$repo_ver" "$repo_commit" "setup-update"
+    fi
+
+    cleanup_old_backups "$II_BACKUP_DIR" 5
+    _write_update_status "success"
+
     echo ""
-    tui_alert "success" "Update complete" "Version $repo_ver ($repo_commit) synced.\nRun './setup rollback' if something breaks."
+    tui_alert "success" "Update complete" "Version $repo_ver ($repo_commit) synced and verified.\nRun './setup rollback' if something breaks."
+
 }
 
 ###############################################################################

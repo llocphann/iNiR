@@ -23,68 +23,21 @@ generate_manifest() {
     local manifest_file="$2"
     local commit
     commit=$(git -C "$repo_root" rev-parse --short HEAD 2>/dev/null || echo "unknown")
-    local runtime_root_manifest="${repo_root}/sdata/runtime-root-files.txt"
-    local runtime_dirs_manifest="${repo_root}/sdata/runtime-payload-dirs.txt"
-
-    # Extensions that get checksums (code files users might modify)
-    local checksum_extensions="qml|js|py|sh|fish"
-
+    local entries
+    entries=$(mktemp) || return 1
+    if ! python3 "$repo_root/sdata/lib/runtime-payload.py" manifest --root "$repo_root" > "$entries"; then
+        rm -f "$entries"
+        return 1
+    fi
     {
-        # Header (will be prepended after sort)
-        # Actual file entries follow
-
-        # Root QML files (with checksums)
-        for qml in "$repo_root"/*.qml; do
-            [[ -f "$qml" ]] || continue
-            local name
-            name=$(basename "$qml")
-            local checksum
-            checksum=$(sha256sum "$qml" 2>/dev/null | cut -d' ' -f1)
-            echo "${name}:${checksum}"
-        done
-
-        if [[ -f "$runtime_root_manifest" ]]; then
-            while IFS= read -r runtime_file; do
-                [[ -n "$runtime_file" ]] || continue
-                local file="${repo_root}/${runtime_file}"
-                [[ -f "$file" ]] || continue
-                local ext="${file##*.}"
-                if [[ "$ext" =~ ^($checksum_extensions)$ ]]; then
-                    local checksum
-                    checksum=$(sha256sum "$file" 2>/dev/null | cut -d' ' -f1)
-                    echo "${runtime_file}:${checksum}"
-                else
-                    echo "${runtime_file}:"
-                fi
-            done < "$runtime_root_manifest"
-        fi
-
-        if [[ -f "$runtime_dirs_manifest" ]]; then
-            while IFS= read -r dir; do
-                [[ -n "$dir" ]] || continue
-                [[ -d "$repo_root/$dir" ]] || continue
-                find "$repo_root/$dir" -type f ! -name 'AGENTS.md' 2>/dev/null | while read -r file; do
-                    local rel_path="${file#$repo_root/}"
-                    local ext="${file##*.}"
-
-                    if [[ "$ext" =~ ^($checksum_extensions)$ ]]; then
-                        local checksum
-                        checksum=$(sha256sum "$file" 2>/dev/null | cut -d' ' -f1)
-                        echo "${rel_path}:${checksum}"
-                    else
-                        echo "${rel_path}:"
-                    fi
-                done
-            done < "$runtime_dirs_manifest"
-        fi
-
-    } | sort -t: -k1 | {
-        # Prepend header
         echo "# inir-manifest v2"
         echo "# generated: $(date -Iseconds)"
         echo "# commit: $commit"
-        cat
+        cat "$entries"
     } > "$manifest_file"
+    local result=$?
+    rm -f "$entries"
+    return "$result"
 }
 
 # Get list of files that exist in target but not in manifest (orphans)
@@ -95,16 +48,14 @@ get_orphan_files() {
     local runtime_root_manifest="${REPO_ROOT}/sdata/runtime-root-files.txt"
     local runtime_dirs_manifest="${REPO_ROOT}/sdata/runtime-payload-dirs.txt"
 
-    if [[ ! -f "$manifest_file" ]]; then
-        return 0
-    fi
+    [[ -f "$manifest_file" ]] || return 0
 
-    # Get current files in target (excluding hidden, backups, and non-tracked dirs)
     local current_files
-    current_files=$(mktemp)
+    current_files=$(mktemp) || return 1
 
-    {
-        # Root QML files
+    if ! (
+      set -o pipefail
+      {
         find "$target_dir" -maxdepth 1 -name "*.qml" -type f -printf "%f\n" 2>/dev/null
 
         if [[ -f "$runtime_root_manifest" ]]; then
@@ -122,18 +73,19 @@ get_orphan_files() {
                 fi
             done < "$runtime_dirs_manifest"
         fi
+      } | python3 "$REPO_ROOT/sdata/lib/runtime-payload.py" filter-installed --root "$REPO_ROOT" | sort -u > "$current_files"
+    ); then
+        rm -f "$current_files"
+        return 1
+    fi
 
-    } | sort -u > "$current_files"
-
-    # Extract just paths from manifest (handles both v1 and v2 formats)
     local manifest_paths
-    manifest_paths=$(mktemp)
+    manifest_paths=$(mktemp) || { rm -f "$current_files"; return 1; }
     grep -v "^#" "$manifest_file" | cut -d: -f1 | sort -u > "$manifest_paths"
-
-    # Find files in current but not in manifest
     comm -23 "$current_files" "$manifest_paths"
-
+    local result=$?
     rm -f "$current_files" "$manifest_paths"
+    return "$result"
 }
 
 #####################################################################################
@@ -211,49 +163,63 @@ cleanup_old_backups() {
 # Verify quickshell loads without fatal errors
 verify_qs_loads() {
     local timeout_sec="${1:-$VERIFICATION_TIMEOUT}"
-    
-    # Kill any existing instance
-    qs -p "$II_TARGET" kill 2>/dev/null || true
-    sleep 0.5
-    
-    # Try to start and capture output
-    local output
-    local exit_code
-    
-    output=$(timeout "$timeout_sec" qs -p "$II_TARGET" 2>&1) || exit_code=$?
-    
-    # Check for fatal errors (not warnings)
-    if echo "$output" | grep -qE "^[[:space:]]*(ERROR|FATAL|error:|Error:)" | grep -v "polkit\|bluez"; then
-        log_error "Quickshell failed to load properly"
-        echo "$output" | grep -E "(ERROR|FATAL|error:|Error:)" | head -5
+    local target="${2:-$II_TARGET}"
+
+    if [[ ! -f "$target/shell.qml" ]]; then
+        log_error "Quickshell verification target is missing shell.qml: $target"
         return 1
     fi
-    
-    # Check if Configuration Loaded message appeared
-    if echo "$output" | grep -q "Configuration Loaded"; then
+    if ! command -v qs >/dev/null 2>&1 || ! command -v timeout >/dev/null 2>&1; then
+        log_error "Quickshell verification requires qs and timeout"
+        return 1
+    fi
+
+    # Probe with an isolated instance. Do not kill the currently running shell:
+    # update verification must never destroy the known-good instance first.
+    local output=""
+    local exit_code=0
+    output=$(timeout "$timeout_sec" qs -n -p "$target" 2>&1) || exit_code=$?
+
+    local fatal_output=""
+    fatal_output=$(printf '%s\n' "$output" \
+        | grep -E 'QQmlApplicationEngine failed|SyntaxError|ReferenceError|TypeError|Type .* unavailable|module .* is not installed|^[[:space:]]*(ERROR|FATAL|error:|Error:)' \
+        | grep -Eiv 'polkit|bluez' || true)
+    if [[ -n "$fatal_output" ]]; then
+        log_error "Quickshell failed to load properly"
+        printf '%s\n' "$fatal_output" | head -8
+        return 1
+    fi
+
+    # shell.qml emits this immediately from Component.onCompleted. The older
+    # Configuration Loaded marker is retained for compatibility with older payloads.
+    if printf '%s\n' "$output" | grep -Fq 'Component.onCompleted (shell.qml ready)' \
+            || printf '%s\n' "$output" | grep -Fq 'Configuration Loaded'; then
         return 0
     fi
-    
-    # If timeout but no errors, assume OK (qs keeps running)
-    if [[ "$exit_code" == "124" ]]; then
-        return 0
+
+    if [[ "$exit_code" -eq 124 ]]; then
+        log_error "Quickshell probe timed out before the shell startup marker"
+    elif [[ "$exit_code" -ne 0 ]]; then
+        log_error "Quickshell probe exited with status $exit_code before startup completed"
+    else
+        log_error "Quickshell probe exited without a shell startup marker"
     fi
-    
-    return 0
+    [[ -n "$output" ]] && printf '%s\n' "$output" | tail -12 >&2
+    return 1
 }
 
 # Full verification suite
 run_verification() {
+    local mode="${1:-runtime}"
     local errors=0
-    
+
     log_info "Running post-update verification..."
-    
-    # 1. Check manifest exists
+
     if [[ ! -f "$II_MANIFEST_FILE" ]]; then
-        log_warning "Manifest file missing (will be created)"
+        log_error "Manifest file missing: $II_MANIFEST_FILE"
+        ((errors++))
     fi
-    
-    # 2. Check critical files exist
+
     local critical_files=("shell.qml" "GlobalStates.qml" "modules/common/Config.qml")
     for file in "${critical_files[@]}"; do
         if [[ ! -f "$II_TARGET/$file" ]]; then
@@ -261,31 +227,35 @@ run_verification() {
             ((errors++))
         fi
     done
-    
-    # 3. Check script permissions
+
     if [[ -d "$II_TARGET/scripts" ]]; then
         local scripts_without_exec
-        scripts_without_exec=$(find "$II_TARGET/scripts" -name "*.sh" -o -name "*.fish" -o -name "*.py" | while read -r f; do
-            [[ ! -x "$f" ]] && echo "$f"
-        done)
-        
+        scripts_without_exec=$(find "$II_TARGET/scripts" -type f \( -name "*.sh" -o -name "*.fish" -o -name "*.py" \) ! -executable 2>/dev/null || true)
         if [[ -n "$scripts_without_exec" ]]; then
             log_warning "Fixing script permissions..."
-            find "$II_TARGET/scripts" \( -name "*.sh" -o -name "*.fish" -o -name "*.py" \) -exec chmod +x {} \;
+            find "$II_TARGET/scripts" -type f \( -name "*.sh" -o -name "*.fish" -o -name "*.py" \) -exec chmod +x {} \; 2>/dev/null || true
         fi
     fi
-    
-    # 4. Verify QS loads (only if no critical errors)
-    if [[ $errors -eq 0 ]]; then
+
+    # Run repository-wide syntax/startup guards when fish is available. The
+    # checker uses qmlformat when installed and still runs critical guards without it.
+    if command -v fish >/dev/null 2>&1 && [[ -f "${REPO_ROOT}/scripts/qml-check.fish" ]]; then
+        if ! fish "${REPO_ROOT}/scripts/qml-check.fish" --all --root "$II_TARGET"; then
+            log_error "QML static verification failed"
+            ((errors++))
+        fi
+    fi
+
+    if [[ "$mode" != "static" && $errors -eq 0 ]]; then
         if ! verify_qs_loads; then
-            log_error "Quickshell verification failed"
+            log_error "Quickshell runtime verification failed"
             ((errors++))
         else
             log_success "Quickshell loads correctly"
         fi
     fi
-    
-    return $errors
+
+    return "$errors"
 }
 
 #####################################################################################
@@ -299,7 +269,7 @@ cleanup_orphans() {
     local dry_run="${3:-false}"
     
     local orphans
-    orphans=$(get_orphan_files "$target_dir" "$manifest_file")
+    orphans=$(get_orphan_files "$target_dir" "$manifest_file") || return 1
     
     if [[ -z "$orphans" ]]; then
         log_info "No orphan files found"
