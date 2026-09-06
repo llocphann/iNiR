@@ -40,6 +40,7 @@ jobs:
           PY
           python3 tools/apply-update-lifecycle-hardening.py
           python3 tools/apply-test-contract-refresh.py
+          python3 scripts/lib/generate-ipc-registry.py
 
       - name: Validate shell syntax and policy files
         run: |
@@ -56,6 +57,7 @@ jobs:
           python3 -m json.tool sdata/runtime-exclusions.json >/dev/null
           python3 -m py_compile sdata/lib/runtime-payload.py tools/apply-update-lifecycle-hardening.py tools/apply-test-contract-refresh.py
           make -n install PREFIX=/tmp/inir-stage-test >/dev/null
+          python3 scripts/lib/generate-ipc-registry.py --check
 
       - name: Run lifecycle regression tests
         run: |
@@ -71,7 +73,7 @@ jobs:
 
       - name: Commit generated fix
         run: |
-          git checkout -- tools/apply-update-lifecycle-hardening.py
+          git checkout -- tools/apply-update-lifecycle-hardening.py tools/apply-test-contract-refresh.py
           if git diff --quiet; then
             echo 'No generated changes'
             exit 0
@@ -84,6 +86,8 @@ jobs:
             sdata/lib/robust-update.sh \
             sdata/lib/snapshots.sh \
             scripts/test-local-distribution.sh \
-            scripts/test-battery-charge-limit-helper.sh
+            scripts/test-battery-charge-limit-helper.sh \
+            docs/IPC.md \
+            scripts/lib/ipc-registry.sh
           git commit -m 'fix(update): harden verification and lifecycle'
           git push
