@@ -29,6 +29,17 @@ text = replace_once(text, old, new, "retired classic TLP assertions")
 path.write_text(text, encoding="utf-8")
 
 
+# Keep docs metadata in sync with the touchpad OSD IPC handler before regenerating
+# scripts/lib/ipc-registry.sh.
+ipc_path = Path("docs/IPC.md")
+ipc = ipc_path.read_text(encoding="utf-8")
+if "\n### osdInput\n" not in ipc:
+    osd_volume = '''### osdVolume\n\nOn-screen volume indicator.\n\n| Function | Description |\n|----------|-------------|\n| `trigger` | Show volume OSD |\n| `toggle` | Toggle volume OSD |\n| `hide` | Hide volume OSD |\n\n---\n'''
+    osd_with_input = osd_volume + '''\n### osdInput\n\nInput-device OSD notifications. Used by keyboard/touchpad helpers to show the effective input state.\n\n| Function | Description |\n|----------|-------------|\n| `touchpad <state>` | Show touchpad state (`on` or `off`) |\n\n---\n'''
+    ipc = replace_once(ipc, osd_volume, osd_with_input, "osdInput IPC docs")
+    ipc_path.write_text(ipc, encoding="utf-8")
+
+
 path = Path("scripts/test-local-distribution.sh")
 text = path.read_text(encoding="utf-8")
 text = replace_once(text, "import pathlib\nimport sys\n", "import pathlib\nimport re\nimport sys\n", "python imports")
