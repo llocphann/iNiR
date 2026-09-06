@@ -46,6 +46,13 @@ mascot = '''step "canonical runtime payload"\npayload_tool="$runtime_root/sdata/
     'assets/images/mascot/PROMPTS.md'; do\n    if grep -Fq "$forbidden" "$payload_list"; then\n        printf 'FAIL: canonical payload leaks local mascot artifact: %s\\n' "$forbidden" >&2\n        exit 1\n    fi\ndone\nif grep -Eq '^assets/images/mascot/.*\\.(png|gif)$' "$payload_list"; then\n    printf 'FAIL: canonical payload leaks local mascot image artifacts\\n' >&2\n    exit 1\nfi\nif ! grep -Fq 'runtime-payload.py copy' "$runtime_root/Makefile"; then\n    printf 'FAIL: make install does not use the canonical runtime payload policy\\n' >&2\n    exit 1\nfi\n\n'''
 text = text[:mascot_start] + mascot + text[mascot_end:]
 
+text = replace_once(
+    text,
+    '''step "launcher resolution"\nbash "$launcher" path >/dev/null\nbash "$launcher" status >/dev/null\n''',
+    '''step "launcher resolution"\nINIR_RUNTIME_DIR="$runtime_root" bash "$launcher" path >/dev/null\nINIR_RUNTIME_DIR="$runtime_root" bash "$launcher" status >/dev/null\n''',
+    "launcher resolution in checkout-only CI",
+)
+
 leak_start = text.index('step "agent artifact leak guard"')
 leak_end = text.index("printf '\\nAll local distribution checks passed.\\n'", leak_start)
 leak = '''step "runtime payload boundary"\n# Validate delivered output, not duplicated implementation-specific exclude lists.\nagent_names=(AGENTS.md CLAUDE.md CODEX.md PI.md codemap.md .mcp.json opencode.json skills-lock.json)\nagent_dirs=(.claude .factory .opencode .codex .agents .codebase-memory .impeccable .pi-subagents)\nfor name in "${agent_names[@]}"; do\n    if grep -Eq "(^|/)${name//./\\.}$" "$payload_list"; then\n        printf 'FAIL: canonical payload leaks agent artifact: %s\\n' "$name" >&2\n        exit 1\n    fi\ndone\nfor name in "${agent_dirs[@]}"; do\n    escaped="${name//./\\.}"\n    if grep -Eq "(^|/)${escaped}(/|$)" "$payload_list"; then\n        printf 'FAIL: canonical payload leaks agent directory: %s\\n' "$name" >&2\n        exit 1\n    fi\ndone\nfor forbidden in \\
