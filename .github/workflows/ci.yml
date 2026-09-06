@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static-and-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fish jq rsync
+
+      - name: Validate syntax and generated state
+        run: |
+          bash -n setup
+          bash -n sdata/lib/functions.sh
+          bash -n sdata/lib/robust-update.sh
+          bash -n sdata/lib/snapshots.sh
+          bash -n scripts/test-update-lifecycle.sh
+          bash -n scripts/test-local-distribution.sh
+          bash -n scripts/test-battery-charge-limit-helper.sh
+          bash -n scripts/test-tlp-settings-ui-guards.sh
+          bash -n scripts/test-tlp-integration-lifecycle.sh
+          bash -n distro/arch/inir-shell/PKGBUILD
+          bash -n distro/arch/inir-shell-git/PKGBUILD
+          bash -n distro/arch/inir-meta/PKGBUILD
+          python3 -m json.tool sdata/runtime-exclusions.json >/dev/null
+          python3 -m py_compile sdata/lib/runtime-payload.py scripts/lib/generate-ipc-registry.py
+          python3 scripts/lib/generate-ipc-registry.py --check
+          make -n install PREFIX=/tmp/inir-stage-test >/dev/null
+
+      - name: Run updater and TLP regressions
+        run: |
+          bash scripts/test-update-lifecycle.sh
+          bash scripts/test-tlp-settings-ui-guards.sh
+          bash scripts/test-tlp-integration-lifecycle.sh
+
+      - name: Run QML startup guards
+        run: fish scripts/qml-check.fish --all
+
+      - name: Run aggregate static suite
+        run: bash scripts/test-local-distribution.sh
